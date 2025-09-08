@@ -1,0 +1,95 @@
+services:
+  # API Gateway
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ../configs/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - auth-service
+      - core-service
+      - files-service
+    restart: unless-stopped
+
+  # Auth Service
+  auth-service:
+    build:
+      context: ../services/auth
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ../services/auth:/app:cached
+      - /app/tmp
+    expose:
+      - "8001"
+    environment:
+  
+      - PORT=8001
+      - DB_URL=postgres://user:password@main-db:5432/tutuplapak?sslmode=disable
+    depends_on:
+      - main-db
+    restart: unless-stopped
+
+  # Core Service
+  core-service:
+    build:
+      context: ../services/core
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ../services/core:/app:cached
+      - /app/tmp
+    expose:
+      - "8002"
+    environment:
+      - PORT=8002
+      - DB_URL=postgres://user:password@main-db:5432/tutuplapak?sslmode=disable
+      - AUTH_SERVICE_URL=http://auth-service:8001
+      - FILE_SERVICE_URL=http://auth-service:8003
+    depends_on:
+      - main-db
+    restart: unless-stopped
+
+  # Files Service
+  files-service:
+    build:
+      context: ../services/files
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ../services/files:/app:cached
+      - /app/tmp
+    expose:
+      - "8003"
+    environment:
+      - PORT=8003
+      - DB_URL=postgres://user:password@main-db:5432/tutuplapak?sslmode=disable
+    depends_on:
+      - main-db
+    restart: unless-stopped
+
+  # Main Database
+  main-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: tutuplapak
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    volumes:
+      - main_data:/var/lib/postgresql/data
+      - ../migrations:/docker-entrypoint-initdb.d/:ro
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d tutuplapak"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  main_data:
+    driver: local
+
+networks:
+  default:
+    name: tutuplapak-network
