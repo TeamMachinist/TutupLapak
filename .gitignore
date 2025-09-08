@@ -21,12 +21,22 @@ profile.cov
 # vendor/
 
 # Go workspace file
-go.work
-go.work.sum
+# go.work
+# go.work.sum
+
+# Air build artifacts
+tmp/
 
 # env file
 .env
 
+# Docker volumes
+*_data/
+
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
