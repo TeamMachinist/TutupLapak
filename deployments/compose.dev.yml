@@ -16,9 +16,12 @@ services:
   auth-service:
     build:
       context: ../services/auth
-      dockerfile: Dockerfile
-    expose:
-      - "${AUTH_PORT}"
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ../services/auth:/app:cached
+      - /app/tmp
+    ports:
+      - "${AUTH_PORT}:${AUTH_PORT}"
     environment:
       - PORT=${AUTH_PORT}
       - DATABASE_URL=${DATABASE_URL}
@@ -30,9 +33,12 @@ services:
   core-service:
     build:
       context: ../services/core
-      dockerfile: Dockerfile
-    expose:
-      - "${CORE_PORT}"
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ../services/core:/app:cached
+      - /app/tmp
+    ports:
+      - "${CORE_PORT}:${CORE_PORT}"
     environment:
       - PORT=${CORE_PORT}
       - DATABASE_URL=${DATABASE_URL}
@@ -46,9 +52,12 @@ services:
   files-service:
     build:
       context: ../services/files
-      dockerfile: Dockerfile
-    expose:
-      - "${FILES_PORT}"
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ../services/files:/app:cached
+      - /app/tmp
+    ports:
+      - "${FILES_PORT}:${FILES_PORT}"
     environment:
       - PORT=${FILES_PORT}
       - DATABASE_URL=${DATABASE_URL}
@@ -66,6 +75,8 @@ services:
     volumes:
       - main_data:/var/lib/postgresql/data
       - ../migrations:/docker-entrypoint-initdb.d/:ro
+    ports:
+      - "5432:5432"
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
