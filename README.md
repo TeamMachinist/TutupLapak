@@ -4,10 +4,16 @@ Ayuk jualan barangmu sambil tutup lapak offline mu 🤩
 
 ## Quick Start
 
-### 1. Start Services
+### 1. Development Commands
+
 ```bash
-cd deployments
-docker-compose up --build
+make dev          # Start all services
+make dev-build    # Force rebuild + start
+make auth-dev     # Start auth + nginx + db only
+make core-dev     # Start core + nginx + db only
+make files-dev    # Start files + nginx + db only
+make down         # Stop all services
+make sqlc         # Generate database code
 ```
 
 ### 2. Test Health Endpoints
@@ -25,10 +31,35 @@ curl http://localhost/healthz/files  # files service
 - **Files Service**: Port 8003 - File upload/download
 - **Nginx**: Port 80 - API Gateway
 
-## Next Steps
+## Database Integration
 
-1. Add database integration (SQLC)
-2. Implement authentication (JWT)
-3. Add Redis caching
-4. Add MinIO file storage
-5. Implement business logic
+### Setup SQLC (Everyone)
+```bash
+# Install SQLC - follow platform-specific instructions:
+# https://docs.sqlc.dev/en/stable/overview/install.html
+
+# Generate type-safe queries and models (run in project root)
+sqlc generate
+
+# IMPORTANT: Commit the generated files
+git add internal/database/
+git commit -m "Generate SQLC database code"
+```
+
+**Rule: Whoever adds/modifies queries runs `sqlc generate` and commits the results.**
+
+### Usage in Services
+```go
+// In main.go
+db, err := internal.NewDatabase(ctx, DatabaseURL)
+defer db.Close()
+
+// Initialize layers
+repo := NewRepository(db.Queries)
+service := NewService(repo)
+handler := NewHandler(service)
+
+// Use generated models
+var user database.UsersAuth  // SQLC generated model
+var file database.Files      // SQLC generated model
+```
