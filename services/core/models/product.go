@@ -1,6 +1,10 @@
 package models
 
-import "github.com/google/uuid"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type Product struct {
 	ID               uuid.UUID `json:"productId"`
@@ -13,8 +17,8 @@ type Product struct {
 	FileURI          string    `json:"fileUri"`
 	FileThumbnailURI string    `json:"fileThumbnailUri"`
 	UserID           uuid.UUID `json:"userId"`
-	CreatedAt        string    `json:"createdAt"`
-	UpdatedAt        string    `json:"updatedAt"`
+	CreatedAt        time.Time `json:"createdAt"`
+	UpdatedAt        time.Time `json:"updatedAt"`
 }
 
 type CreateProductRequest struct {
@@ -37,15 +41,15 @@ type ProductResponse struct {
 	FileID           uuid.UUID `json:"fileId"`
 	FileURI          string    `json:"fileUri"`
 	FileThumbnailURI string    `json:"fileThumbnailUri"`
-	CreatedAt        string    `json:"createdAt"`
-	UpdatedAt        string    `json:"updatedAt"`
+	CreatedAt        time.Time `json:"createdAt"`
+	UpdatedAt        time.Time `json:"updatedAt"`
 }
 
 type ListProductsRequest struct {
-	Limit     int       `json:"limit"`
-	Offset    int       `json:"offset"`
-	ProductID uuid.UUID `json:"productId"`
-	SKU       string    `json:"sku"`
-	Category  string    `json:"category"`
-	SortBy    string    `json:"sortBy"`
+	ProductID *uuid.UUID `json:"product_id,omitempty"`
+	SKU       string     `json:"sku,omitempty"`
+	Category  string     `json:"category,omitempty"`
+	SortBy    string     `json:"sort_by,omitempty"`
+	Limit     int        `json:"limit,omitempty"`
+	Offset    int        `json:"offset,omitempty"`
 }

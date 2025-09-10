@@ -6,10 +6,13 @@ import (
 
 	"tutuplapak-core/models"
 	"tutuplapak-core/repositories"
+
+	"github.com/google/uuid"
 )
 
 type ProductServiceInterface interface {
 	CreateProduct(ctx context.Context, req models.CreateProductRequest) (models.ProductResponse, error)
+	GetAllProducts(ctx context.Context, filter GetAllProductsFilter) ([]models.ProductResponse, error)
 }
 
 type ProductService struct {
@@ -63,10 +66,58 @@ func (s *ProductService) CreateProduct(ctx context.Context, req models.CreatePro
 	return productResp, nil
 }
 
-func (s *ProductService) ListProducts(ctx context.Context, req models.ListProductsRequest) ([]models.ProductResponse, error) {
-	products, err := s.productRepo.ListProducts(ctx, req)
+// Filter struct — tanpa pointer untuk limit/offset (selalu ada)
+type GetAllProductsFilter struct {
+	Limit     int
+	Offset    int
+	ProductID *uuid.UUID
+	SKU       *string
+	Category  *string
+	SortBy    *string
+}
+
+func (s *ProductService) GetAllProducts(ctx context.Context, filter GetAllProductsFilter) ([]models.ProductResponse, error) {
+	// Panggil repo
+	products, err := s.productRepo.GetAllProducts(ctx, repositories.GetAllProductsParams{
+		Limit:     filter.Limit,
+		Offset:    filter.Offset,
+		ProductID: filter.ProductID,
+		SKU:       filter.SKU,
+		Category:  filter.Category,
+		SortBy:    filter.SortBy,
+	})
 	if err != nil {
 		return nil, err
 	}
-	return products, nil
+
+	var responses []models.ProductResponse
+
+	for _, p := range products {
+		resp := models.ProductResponse{
+			ProductID: p.ID,
+			Name:      p.Name,
+			Category:  p.Category,
+			Qty:       p.Qty,
+			Price:     p.Price,
+			SKU:       p.SKU,
+			FileID:    p.FileID,
+			CreatedAt: p.CreatedAt,
+			UpdatedAt: p.UpdatedAt,
+			// FileURI & FileThumbnailURI akan diisi di bawah
+		}
+
+		// // Ambil file metadata jika FileID valid
+		// if p.FileID != uuid.Nil {
+		// 	file, err := s.fileClient.GetFileByID(ctx, p.FileID)
+		// 	if err == nil {
+		// 		resp.FileURI = file.URI
+		// 		resp.FileThumbnailURI = file.ThumbnailURI
+		// 	}
+		// 	// Jika error, biarkan kosong — sesuai permintaan "ignore if invalid"
+		// }
+
+		responses = append(responses, resp)
+	}
+
+	return responses, nil
 }

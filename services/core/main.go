@@ -57,7 +57,9 @@ func main() {
 
 	products := api.Group("/products")
 	{
+		products.Get("", productHandler.GetAllProducts)
 		products.Post("", productHandler.CreateProduct)
+
 	}
 
 	c := make(chan os.Signal, 1)

@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"tutuplapak-core/models"
@@ -19,6 +20,84 @@ type ProductHandler struct {
 
 func NewProductHandler(productService services.ProductServiceInterface) *ProductHandler {
 	return &ProductHandler{productService: productService}
+}
+
+func (h *ProductHandler) GetAllProducts(c *fiber.Ctx) error {
+	ctx := c.Context()
+
+	limit := 5
+	offset := 0
+
+	var productID *uuid.UUID
+	var sku *string
+	var category *string
+	var sortBy *string
+
+	if limStr := c.Query("limit"); limStr != "" {
+		if l, err := strconv.Atoi(limStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	if offStr := c.Query("offset"); offStr != "" {
+		if o, err := strconv.Atoi(offStr); err == nil && o >= 0 {
+			offset = o
+		}
+	}
+
+	// Parse productId — ignore if invalid
+	if pidStr := c.Query("productId"); pidStr != "" {
+		if pid, err := uuid.Parse(pidStr); err == nil {
+			productID = &pid
+		}
+		// Jika error parsing UUID, biarkan nil → akan diabaikan di repo
+	}
+
+	// Parse sku — ignore if invalid
+	if s := c.Query("sku"); s != "" {
+		sku = &s
+	}
+
+	// Parse category — ignore if invalid
+	// Optional: tambahkan validasi enum jika ada daftar kategori tetap
+	if cat := c.Query("category"); cat != "" {
+		category = &cat
+	}
+
+	// Parse sortBy — hanya terima nilai valid
+	if sb := c.Query("sortBy"); sb != "" {
+		validSorts := map[string]bool{
+			"newest":    true,
+			"oldest":    true,
+			"cheapest":  true,
+			"expensive": true,
+		}
+		if validSorts[strings.ToLower(sb)] {
+			lower := strings.ToLower(sb)
+			sortBy = &lower
+		}
+		// Jika tidak valid, biarkan nil → akan diabaikan (default sort by created_at DESC)
+	}
+
+	// Panggil service
+	filter := services.GetAllProductsFilter{
+		Limit:     limit,
+		Offset:    offset,
+		ProductID: productID,
+		SKU:       sku,
+		Category:  category,
+		SortBy:    sortBy,
+	}
+
+	products, err := h.productService.GetAllProducts(ctx, filter)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch products",
+		})
+	}
+
+	// Return langsung slice ProductResponse
+	return c.Status(fiber.StatusOK).JSON(products)
 }
 
 func (h *ProductHandler) CreateProduct(c *fiber.Ctx) error {
