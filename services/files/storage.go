@@ -28,8 +28,8 @@ type MinIOStorage struct {
 
 func NewMinIOStorage(config *MinIOConfig) (*MinIOStorage, error) {
 	client, err := minio.New(config.Endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(config.AccessKey, config.SecretKey, ""),
-		Secure: config.UseSSL,
+    Creds:  credentials.NewStaticV4(config.AccessKey, config.SecretKey, ""),		
+	Secure: config.UseSSL,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize MinIO client: %w", err)

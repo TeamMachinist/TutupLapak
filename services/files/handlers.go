@@ -3,15 +3,13 @@ package main
 import (
 	"net/http"
 	"strings"
-
-	"github.com/go-chi/chi/v5"
 )
 
 type FileHandler struct {
-	storage *storage.MinIOStorage
+	storage *MinIOStorage
 }
 
-func NewFileHandler(minioStorage *storage.MinIOStorage) *FileHandler {
+func NewFileHandler(minioStorage *MinIOStorage) *FileHandler {
 	return &FileHandler{
 		storage: minioStorage,
 	}
@@ -19,6 +17,7 @@ func NewFileHandler(minioStorage *storage.MinIOStorage) *FileHandler {
 
 func (h *FileHandler) UploadFile(w http.ResponseWriter,r *http.Request) {
 	file, header, err := r.FormFile("picture")
+	ctx := r.Context()
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("File is Required"))
@@ -53,7 +52,7 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter,r *http.Request) {
 	}
 
 	// Upload to MinIO
-	uri, err := h.storage.UploadFile(chi.Context, file, header)
+	uri, err := h.storage.UploadFile(ctx, file, header)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("Failed to upload File"))

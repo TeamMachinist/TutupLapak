@@ -5,8 +5,10 @@ import (
 	"database/sql"
 	"fmt"
 	"mime/multipart"
+	"strings"
 
 	"github.com/google/uuid"
+	"github.com/h2non/bimg"
 )
 
 type FileStorage interface {
@@ -46,4 +48,24 @@ func (s *FileService) UploadFile(ctx context.Context, userID uuid.UUID, fh *mult
 	}
 
 	return key, nil
+}
+
+func imageProcessing(buffer []byte, quality int, dirname string) (string, error){
+	filename := strings.Replace(uuid.New().String()+ ".jpeg", "-","",-1) //image name after converted
+	converted, err := bimg.NewImage(buffer).Convert(bimg.JPEG) // convert image to JPEG
+	if err !=nil {
+		return filename, err
+	}
+	//compress the image
+	processed, err := bimg.NewImage(converted).Process(bimg.Options{Quality: quality, StripMetadata: true}) 
+	if err != nil{
+		return filename, err
+	}
+	//Save image in  "uploads" folder
+	writeError := bimg.Write(fmt.Sprintf("./" + dirname + "/%s", filename), processed) 
+	if writeError != nil{
+		return filename, writeError
+	}
+	return filename, nil
+
 }
