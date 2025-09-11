@@ -2,15 +2,11 @@ package main
 
 import (
 	"log"
-	"net/http"
 	"os"
-)
 
-func healthHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status":"healthy","service":"core"}`))
-}
+	"github.com/gin-gonic/gin"
+	"github.com/teammachinist/tutuplapak/services/core/handlers"
+)
 
 func main() {
 	port := os.Getenv("PORT")
@@ -18,8 +14,14 @@ func main() {
 		port = "8002"
 	}
 
-	http.HandleFunc("/healthz", healthHandler)
+	healthHandler := handlers.NewHealthHandler()
+
+	// Setup Gin router
+	router := gin.Default()
+
+	// Health check endpoint
+	router.GET("/healthz", healthHandler.HealthCheck)
 
 	log.Printf("Core service starting on port %s", port)
-	log.Fatal(http.ListenAndServe(":"+port, nil))
+	log.Fatal(router.Run(":" + port))
 }
