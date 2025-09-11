@@ -1,10 +1,8 @@
-package internal
+package main
 
 import (
 	"context"
 	"fmt"
-
-	"tutuplapak/internal/database"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

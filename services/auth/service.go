@@ -1,4 +1,4 @@
-package auth
+package main
 
 import (
 	"context"
@@ -7,99 +7,29 @@ import (
 	"log"
 	"time"
 
-	"https://github.com/TeamMachinist/TutupLapak/internal"
-	"https://github.com/TeamMachinist/TutupLapak/services/auth"
-
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type UserService struct {
-	userRepo   *repository.UserRepository
+type AuthService struct {
+	authRepo   *repository.AuthRepository
 	cache      *cache.Redis
-	userUtils  utils.PasswordHasher
+	hasher     utils.PasswordHasher
 	jwtService JwtService
 }
 
-func NewUserService(userRepo *repository.UserRepository, cache *cache.Redis, jwt JwtService) *UserService {
-	return &UserService{
-		userRepo:   userRepo,
+func NewAuthService(authRepo *repository.AuthRepository, cache *cache.Redis, jwt JwtService) *AuthService {
+	return &AuthService{
+		authRepo:   authRepo,
 		cache:      cache,
-		userUtils:  utils.NewPasswordHasher(),
-		jwtService: jwt,
-	}
-}
-
-func (s *UserService) RegisterNewUser(ctx context.Context, payload model.User) (model.AuthResponse, error) {
-	// Business Logic
-	// Check if email exists Import get email function
-
-	hashedPassword, err := s.userUtils.EncryptPassword(payload.Password)
-	if err != nil {
-		return model.AuthResponse{}, fmt.Errorf("failed to encrypt password: %v", err)
-	}
-	payload.Password = hashedPassword
-
-	// Payload exists here
-	createdUser, err := s.userRepo.RegisterNewUser(ctx, payload)
-	if err != nil {
-		if ctx.Err() != nil {
-			return model.AuthResponse{}, fmt.Errorf("context error: %v", ctx.Err())
-		}
-		return model.AuthResponse{}, fmt.Errorf("failed to create user: %v", err)
-	}
-
-	token, err := s.jwtService.GenerateToken(&createdUser)
-	if err != nil {
-		return model.AuthResponse{}, fmt.Errorf("failed to generate token: %v", err)
-	}
-
-	return model.AuthResponse{Email: createdUser.Email, Token: token}, nil
-}
-
-func (s *UserService) Login(ctx context.Context, payload model.User) (model.AuthResponse, error) {
-	if payload.Email == "" {
-		return model.AuthResponse{}, fmt.Errorf("email is required")
-	}
-	if payload.Password == "" {
-		return model.AuthResponse{}, fmt.Errorf("password is required")
-	}
-
-	user, err := s.userRepo.GetUserByEmail(ctx, payload.Email)
-	if err != nil {
-		return model.AuthResponse{}, fmt.Errorf("user not found")
-	}
-
-	if err := s.userUtils.ComparePasswordHash(user.Password, payload.Password); err != nil {
-		return model.AuthResponse{}, fmt.Errorf("invalid credentials")
-	}
-
-	token, err := s.jwtService.GenerateToken(&user)
-	if err != nil {
-		return model.AuthResponse{}, fmt.Errorf("failed to generate token: %v", err)
-	}
-
-	return model.AuthResponse{Email: payload.Email, Token: token}, nil
-}
-
-type UserService struct {
-	userRepo   *repository.UserRepository
-	cache      *cache.Redis
-	userUtils  utils.PasswordHasher
-	jwtService JwtService
-}
-
-func NewUserService(userRepo *repository.UserRepository, cache *cache.Redis, jwt JwtService) *UserService {
-	return &UserService{
-		userRepo:   userRepo,
-		cache:      cache,
-		userUtils:  utils.NewPasswordHasher(), // Consider making this a singleton if expensive to create
+		hasher:  	utils.NewPasswordHasher(), // Consider making this a singleton if expensive to create
 		jwtService: jwt,
 	}
 }
 
 // RegisterNewUser optimized for performance with value passing
 // Uses stack allocation for better cache locality and reduced GC pressure
-func (s *UserService) RegisterNewUser(ctx context.Context, payload model.User) (model.AuthResponse, error) {
+func (s *AuthService) RegisterWithEmail(ctx context.Context, model.EmailAuthRequest) (model.AuthResponse, error) {
 	// Early context check to avoid unnecessary work
 	select {
 	case <-ctx.Done():
@@ -108,23 +38,21 @@ func (s *UserService) RegisterNewUser(ctx context.Context, payload model.User) (
 	}
 
 	// Check if email exists using cache first, then database
-	exists, err := s.checkUserExists(ctx, payload.Email)
+	exists, err := s.checkExistedUserByEmailWithCache(ctx, payload.Email)
 	if err != nil {
 		return model.AuthResponse{}, fmt.Errorf("failed to check user existence: %w", err)
 	}
 	if exists {
-		return model.AuthResponse{}, ErrUserExists
+		return model.AuthResponse{}, error.ErrConflict
 	}
 
 	// Hash password - this is CPU intensive, do it early
-	hashedPassword, err := s.userUtils.EncryptPassword(payload.Password)
+	hashedPassword, err := s.hasher.EncryptPassword(payload.Password)
 	if err != nil {
 		return model.AuthResponse{}, fmt.Errorf("failed to encrypt password: %w", err)
 	}
 
-	// Create a copy with hashed password (avoiding mutation of original)
-	userToCreate := payload
-	userToCreate.Password = hashedPassword
+	payload.password := hashedPassword
 
 	// Another context check before expensive DB operation
 	select {
@@ -134,7 +62,19 @@ func (s *UserService) RegisterNewUser(ctx context.Context, payload model.User) (
 	}
 
 	// Create user in database
-	createdUser, err := s.userRepo.RegisterNewUser(ctx, userToCreate)
+	user := UsersAuth{}
+	
+	var pgUUID pgtype.UUID
+	copy(pgUUID.Bytes[:], gUUID[:])
+	pgUUID.Status = pgtype.Present
+	
+	user.ID = pgUUID
+	user.Phone = ""
+	user.HashedPassword = payload.hashed_password
+	user.CreatedAt = time.Now()
+	user.UpdatedAt = time.Now()
+	
+	createdUser, err := s.authRepo.RegisterNewUser(ctx, user)
 	if err != nil {
 		// Check if context was cancelled during DB operation
 		if ctx.Err() != nil {
@@ -162,13 +102,13 @@ func (s *UserService) RegisterNewUser(ctx context.Context, payload model.User) (
 
 // Login optimized for high-frequency authentication requests
 // Uses aggressive caching and optimized value passing
-func (s *UserService) Login(ctx context.Context, payload model.User) (model.AuthResponse, error) {
+func (s *AuthService) LoginWithEmail(ctx context.Context, payload model.User) (model.AuthResponse, error) {
 	// Early validation - fail fast for invalid input
 	if payload.Email == "" {
-		return model.AuthResponse{}, ErrInvalidData
+		return model.AuthResponse{}, errors.ErrBadRequest
 	}
 	if payload.Password == "" {
-		return model.AuthResponse{}, ErrInvalidData
+		return model.AuthResponse{}, errors.ErrBadRequest
 	}
 
 	// // Check rate limiting using cache (prevents brute force)
@@ -177,14 +117,14 @@ func (s *UserService) Login(ctx context.Context, payload model.User) (model.Auth
 	// }
 
 	// Try to get user from cache first (hot path optimization)
-	user, err := s.getUserWithCache(ctx, payload.Email)
+	user, err := s.getUserByEmailWithCache(ctx, payload.Email)
 	if err != nil {
-		return model.AuthResponse{}, ErrUserNotFound
+		return model.AuthResponse{}, errors.ErrNotFound
 	}
 
 	// Compare password hash - this is CPU intensive
-	if err := s.userUtils.ComparePasswordHash(user.Password, payload.Password); err != nil {
-		return model.AuthResponse{}, ErrInvalidCredentials
+	if err := s.hasher.ComparePasswordHash(user.Password, payload.Password); err != nil {
+		return model.AuthResponse{}, errors.ErrUnauthorized
 	}
 
 	// Generate JWT token
@@ -196,12 +136,13 @@ func (s *UserService) Login(ctx context.Context, payload model.User) (model.Auth
 	// Return using payload email to avoid any potential inconsistencies
 	return model.AuthResponse{
 		Email: payload.Email,
+		Phone: "",
 		Token: token,
 	}, nil
 }
 
 // checkUserExists checks cache first, then database
-func (s *UserService) checkUserExists(ctx context.Context, email string) (bool, error) {
+func (s *AuthService) CheckExistedUserByEmailWithCache(ctx context.Context, email string) (bool, error) {
 	// Check cache first for recent lookups
 	cacheKey := fmt.Sprintf("user_exists:%s", email)
 	if exists, err := s.cache.Exists(ctx, cacheKey); err == nil && exists {
@@ -209,7 +150,7 @@ func (s *UserService) checkUserExists(ctx context.Context, email string) (bool, 
 	}
 
 	// Check database if not in cache
-	exists, err := s.userRepo.CheckUserExists(ctx, email)
+	exists, err := s.authRepo.CheckExistedUserByEmail(ctx, email)
 	if err != nil {
 		return false, err
 	}
@@ -223,7 +164,7 @@ func (s *UserService) checkUserExists(ctx context.Context, email string) (bool, 
 }
 
 // getUserWithCache attempts cache first, fallback to database
-func (s *UserService) getUserWithCache(ctx context.Context, email string) (model.User, error) {
+func (s *AuthService) getUserByEmailWithCache(ctx context.Context, email string) (model.User, error) {
 	// Try cache first
 	cacheKey := fmt.Sprintf("user:%s", email)
 	var user model.User
@@ -233,7 +174,7 @@ func (s *UserService) getUserWithCache(ctx context.Context, email string) (model
 	}
 
 	// Cache miss - get from database
-	user, err := s.userRepo.GetUserByEmail(ctx, email)
+	user, err := s.authRepo.GetUserByEmail(ctx, email)
 	if err != nil {
 		return model.User{}, err
 	}
@@ -247,7 +188,7 @@ func (s *UserService) getUserWithCache(ctx context.Context, email string) (model
 }
 
 // cacheUserAsync caches user data asynchronously to not block response
-func (s *UserService) cacheUserAsync(user model.User) {
+func (s *AuthService) cacheUserAsync(user model.User) {
 	ctx := context.Background()
 	cacheKey := fmt.Sprintf("user:%s", user.Email)
 	s.cache.Set(ctx, cacheKey, user, 15*time.Minute)

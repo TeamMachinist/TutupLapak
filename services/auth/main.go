@@ -1,37 +1,31 @@
-package auth
+package main
 
 import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
-	"https://github.com/TeamMachinist/TutupLapak/internal"
-	"https://github.com/TeamMachinist/TutupLapak/services/auth"
-
+	"github.com/caarlos0/env"
 	"github.com/gin-gonic/gin"
+	_ "github.com/joho/godotenv/autoload"
+	"github.com/redis/go-redis/v9"
+
 )
 
 type Config struct {
-	HTTPPort    string `env:"HTTP_PORT" envDefault:"8080"`
+	HTTPPort    string `env:"HTTP_PORT" envDefault:"8001"`
 	DatabaseURL string `env:"DATABASE_URL"`
 
 	// JWT Configuration
 	JWTSecret   string        `env:"JWT_SECRET" envDefault:"your-secret-key"`
 	JWTDuration time.Duration `env:"JWT_DURATION" envDefault:"24h"`
-	JWTIssuer   string        `env:"JWT_ISSUER" envDefault:"fitbyte-app"`
+	JWTIssuer   string        `env:"JWT_ISSUER" envDefault:"tutuplapak-app"`
 
 	// Redis Configuration
 	RedisAddr     string `env:"REDIS_ADDR" envDefault:"redis:6379"`
 	RedisPassword string `env:"REDIS_PASSWORD" envDefault:""`
 	RedisDB       int    `env:"REDIS_DB" envDefault:"0"`
-
-	// MinIO Configuration
-	MinIOEndpoint       string `env:"MINIO_ENDPOINT" envDefault:"minio:9000"`
-	MinIOAccessKey      string `env:"MINIO_ACCESS_KEY" envDefault:"minioadmin"`
-	MinIOSecretKey      string `env:"MINIO_SECRET_KEY" envDefault:"minioadmin"`
-	MinIOBucket         string `env:"MINIO_BUCKET" envDefault:"fitbyte-uploads"`
-	MinIOPublicEndpoint string `env:"MINIO_PUBLIC_ENDPOINT" envDefault:"http://localhost:9000"`
-	MinIOUseSSL         bool   `env:"MINIO_USE_SSL" envDefault:"false"`
 }
 
 func main() {
@@ -42,29 +36,29 @@ func main() {
 	}
 
 	// TODO: Connect to database
-	// db, err := database.Connect(cfg.DatabaseURL)
-	// if err != nil {
-	// 	log.Fatal("Failed to connect to database:", err)
-	// }
-	// defer db.Close()
+	db, err := database.Connect(cfg.DatabaseURL)
+	if err != nil {
+		log.Fatal("Failed to connect to database:", err)
+	}
+	defer db.Close()
 
 	// TODO: Initialize Redis cache
-	// redisClient := redis.NewClient(&redis.Options{
-	// 	Addr:     cfg.RedisAddr,
-	// 	Password: cfg.RedisPassword,
-	// 	DB:       cfg.RedisDB,
-	// })
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:     cfg.RedisAddr,
+		Password: cfg.RedisPassword,
+		DB:       cfg.RedisDB,
+	})
 
-	// defer func() {
-	// 	if err := redisClient.Close(); err != nil {
-	// 		log.Printf("Error closing Redis connection: %v", err)
-	// 	}
-	// }()
+	defer func() {
+		if err := redisClient.Close(); err != nil {
+			log.Printf("Error closing Redis connection: %v", err)
+		}
+	}()
 
-	// cache, err := cache.NewRedis(cache.RedisConfig{DB: redisClient})
-	// if err != nil {
-	// 	log.Fatal("Failed to initialize Redis cache:", err)
-	// }
+	cache, err := cache.NewRedis(cache.RedisConfig{DB: redisClient})
+	if err != nil {
+		log.Fatal("Failed to initialize Redis cache:", err)
+	}
 
 	// Initialize JWT service
 	jwtConfig := &service.SecurityConfig{
@@ -77,6 +71,11 @@ func main() {
 	// Initialize health handler
 	healthHandler := handler.NewHealthHandler(db, cache)
 
+	// Initialize users layers
+	authRepo := repository.NewAuthRepository(db)
+	authService := service.NewAuthService(authRepo, cache, jwtService)
+	authHandler := handler.NewUserHandler(authService)
+
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(jwtService)
 
@@ -87,8 +86,8 @@ func main() {
 	http.HandleFunc("/healthz", healthHandler)
 	v1 := r.Group("/api/v1")
 	{
-		v1.POST("/register", userHandler.CreateNewUser)
-		v1.POST("/login", userHandler.Login)
+		v1.POST("/register", authHandler.RegisterWithEmail)
+		v1.POST("/login", authHandler.LoginWithEmail)
 	}
 
 	// Create HTTP server
@@ -99,7 +98,7 @@ func main() {
 
 	// Start server in a goroutine
 	go func() {
-		log.Printf("Auth service starting on port %s", port)
+		log.Printf("Auth service starting on port %s", cfg.HTTPPort)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Failed to start server: %v", err)
 		}

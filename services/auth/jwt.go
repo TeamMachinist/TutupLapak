@@ -1,10 +1,8 @@
-package internal
+package main
 
 import (
 	"errors"
 	"time"
-
-	"https://github.com/TeamMachinist/TutupLapak/services/auth"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"

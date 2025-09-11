@@ -1,4 +1,4 @@
-package internal
+package main
 
 // TODO: Experimental change to Argon2
 import "golang.org/x/crypto/bcrypt"

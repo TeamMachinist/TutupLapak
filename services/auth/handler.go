@@ -1,4 +1,4 @@
-package auth
+package main
 
 import (
 	"context"
@@ -6,11 +6,8 @@ import (
 	"net/http"
 	"regexp"
 	"time"
-
+	
 	"github.com/go-playground/validator/v10"
-	"https://github.com/TeamMachinist/TutupLapak/internal"
-	"https://github.com/TeamMachinist/TutupLapak/services/auth"
-
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -29,13 +26,13 @@ func NewAuthHandler(authService *service.AuthService) *AuthHandler {
 	}
 }
 
-// CreateNewUser - Uses value passing for registration data
+// RegisterWithEmail - Uses value passing for registration data
 // Value passing is preferred here because:
 // 1. Registration payload is relatively small
 // 2. We want stack allocation for better cache locality
 // 3. No GC overhead for short-lived registration data
 // 4. Automatic cleanup when function returns
-func (h *AuthHandler) CreateNewUser(c *gin.Context) {
+func (h *AuthHandler) RegisterWithEmail(c *gin.Context) {
 	requestCtx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 	defer cancel()
 
@@ -66,14 +63,14 @@ func (h *AuthHandler) CreateNewUser(c *gin.Context) {
 	// Pass by value to service layer for stack allocation benefits
 	// The service will copy it once more, but registration is infrequent
 	// and we benefit from predictable cleanup and better cache locality
-	user, err := h.authService.RegisterNewUser(requestCtx, payload)
+	user, err := h.authService.RegisterWithEmail(requestCtx, payload)
 	if err != nil {
 		// Handle different types of service layer errors
 		switch err {
-		case service.ErrUserExists: // Assuming service has specific errors
-			c.JSON(http.StatusConflict, gin.H{"error": errors.ErrConflict.Error()})
-		case service.ErrInvalidData:
+		case errors.StatusBadRequest:
 			c.JSON(http.StatusBadRequest, gin.H{"error": errors.ErrBadRequest.Error()})
+		case errors.ErrConflict:
+			c.JSON(http.StatusConflict, gin.H{"error": errors.ErrConflict.Error()})
 		default:
 			c.JSON(http.StatusInternalServerError, gin.H{"error": errors.ErrInternalServerError.Error()})
 		}
@@ -96,7 +93,7 @@ func (h *AuthHandler) CreateNewUser(c *gin.Context) {
 // 3. No heap fragmentation from frequent small allocations
 // 4. Better CPU cache efficiency for hot path
 // 5. Automatic memory cleanup reduces GC pressure
-func (h *AuthHandler) Login(c *gin.Context) {
+func (h *AuthHandler) LoginWithEmail(c *gin.Context) {
 	requestCtx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 	defer cancel()
 
@@ -124,18 +121,18 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	// - Stack allocation (faster than heap)
 	// - Direct memory access (no indirection)
 	// - Automatic cleanup (no GC needed)
-	user, err := h.authService.Login(requestCtx, payload)
+	user, err := h.authService.LoginWithEmail(requestCtx, payload)
 	if err != nil {
 		// Handle different types of authentication errors
 		switch err {
-		case service.ErrInvalidCredentials: // Assuming service has specific errors
-			c.JSON(http.StatusUnauthorized, gin.H{"error": errors.ErrUnauthorized.Error()})
-		case service.ErrUserNotFound:
+		case errors.StatusBadRequest:
+			c.JSON(http.StatusBadRequest, gin.H{"error": errors.ErrBadRequest.Error()})
+		case errors.ErrConflict:
+			c.JSON(http.StatusConflict, gin.H{"error": errors.ErrConflict.Error()})
+		case errors.ErrNotFound:
 			c.JSON(http.StatusNotFound, gin.H{"error": errors.ErrNotFound.Error()})
-		case service.ErrAccountLocked:
-			c.JSON(http.StatusForbidden, gin.H{"error": errors.ErrForbidden.Error()})
-		case service.ErrTooManyAttempts:
-			c.JSON(http.StatusTooManyRequests, gin.H{"error": errors.ErrTooManyRequests.Error()})
+		case errors.ErrUnauthorized:
+			c.JSON(http.StatusForbidden, gin.H{"error": errors.ErrUnauthorized.Error()})
 		default:
 			c.JSON(http.StatusInternalServerError, gin.H{"error": errors.ErrInternalServerError.Error()})
 		}
