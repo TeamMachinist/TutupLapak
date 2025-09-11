@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"tutuplapak-core/models"
-	"tutuplapak-core/services"
+	"github.com/teammachinist/tutuplapak/services/core/models"
+	"github.com/teammachinist/tutuplapak/services/core/services"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"

@@ -6,9 +6,8 @@ import (
 	"log"
 	"time"
 
-	"tutuplapak-core/config"
-	"tutuplapak-core/internal/db"
-	"tutuplapak-core/models"
+	"github.com/teammachinist/tutuplapak/internal/database"
+	"github.com/teammachinist/tutuplapak/services/core/models"
 
 	"github.com/google/uuid"
 )
@@ -17,23 +16,23 @@ type ProductRepositoryInterface interface {
 	CreateProduct(ctx context.Context, req models.ProductRequest) (models.ProductResponse, error)
 	CheckSKUExistsByUser(ctx context.Context, sku string, userID uuid.UUID) (uuid.UUID, error)
 	GetAllProducts(ctx context.Context, params models.GetAllProductsParams) ([]models.Product, error)
-	UpdateProduct(ctx context.Context, params db.UpdateProductParams) (db.UpdateProductRow, error)
+	UpdateProduct(ctx context.Context, params database.UpdateProductParams) (database.UpdateProductRow, error)
 	CheckProductOwnership(ctx context.Context, productID uuid.UUID, userID uuid.UUID) (bool, error)
 	DeleteProduct(ctx context.Context, productID uuid.UUID, userID uuid.UUID) error
 }
 
 type ProductRepository struct {
-	db *config.Database
+	db database.Querier
 }
 
-func NewProductRepository(database *config.Database) ProductRepositoryInterface {
+func NewProductRepository(database database.Querier) ProductRepositoryInterface {
 	return &ProductRepository{db: database}
 }
 
 func (r *ProductRepository) CreateProduct(ctx context.Context, req models.ProductRequest) (models.ProductResponse, error) {
 	productID := uuid.Must(uuid.NewV7())
 
-	dbProduct, err := r.db.Queries.CreateProduct(ctx, db.CreateProductParams{
+	dbProduct, err := r.db.CreateProduct(ctx, database.CreateProductParams{
 		ID:        productID,
 		Name:      req.Name,
 		Category:  req.Category,
@@ -67,7 +66,7 @@ func (r *ProductRepository) CreateProduct(ctx context.Context, req models.Produc
 }
 
 func (r *ProductRepository) CheckSKUExistsByUser(ctx context.Context, sku string, userID uuid.UUID) (uuid.UUID, error) {
-	productID, err := r.db.Queries.CheckSKUExistsByUser(ctx, db.CheckSKUExistsByUserParams{
+	productID, err := r.db.CheckSKUExistsByUser(ctx, database.CheckSKUExistsByUserParams{
 		Sku:    sku,
 		UserID: userID,
 	})
@@ -88,7 +87,7 @@ func (r *ProductRepository) GetAllProducts(ctx context.Context, params models.Ge
 		offset = int32(params.Offset)
 	}
 
-	args := db.GetAllProductsParams{
+	args := database.GetAllProductsParams{
 		LimitCount:  limit,
 		OffsetCount: offset,
 		ProductID:   uuid.Nil,
@@ -114,7 +113,7 @@ func (r *ProductRepository) GetAllProducts(ctx context.Context, params models.Ge
 
 	log.Printf("Query Args: %+v", args)
 
-	rows, err := r.db.Queries.GetAllProducts(ctx, args)
+	rows, err := r.db.GetAllProducts(ctx, args)
 	if err != nil {
 		fmt.Println("Error fetching products:", err)
 		return nil, err
@@ -142,12 +141,12 @@ func (r *ProductRepository) GetAllProducts(ctx context.Context, params models.Ge
 	return products, nil
 }
 
-func (r *ProductRepository) UpdateProduct(ctx context.Context, params db.UpdateProductParams) (db.UpdateProductRow, error) {
-	return r.db.Queries.UpdateProduct(ctx, params)
+func (r *ProductRepository) UpdateProduct(ctx context.Context, params database.UpdateProductParams) (database.UpdateProductRow, error) {
+	return r.db.UpdateProduct(ctx, params)
 }
 
 func (r *ProductRepository) CheckProductOwnership(ctx context.Context, productID uuid.UUID, userID uuid.UUID) (bool, error) {
-	result, err := r.db.Queries.CheckProductOwnership(ctx, db.CheckProductOwnershipParams{
+	result, err := r.db.CheckProductOwnership(ctx, database.CheckProductOwnershipParams{
 		ProductID: productID,
 		UserID:    userID,
 	})
@@ -159,7 +158,7 @@ func (r *ProductRepository) CheckProductOwnership(ctx context.Context, productID
 }
 
 func (r *ProductRepository) DeleteProduct(ctx context.Context, productID uuid.UUID, userID uuid.UUID) error {
-	err := r.db.Queries.DeleteProduct(ctx, db.DeleteProductParams{
+	err := r.db.DeleteProduct(ctx, database.DeleteProductParams{
 		ID:     productID,
 		UserID: userID,
 	})

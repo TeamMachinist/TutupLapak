@@ -6,9 +6,9 @@ import (
 	"errors"
 	"time"
 
-	"tutuplapak-core/internal/db"
-	"tutuplapak-core/models"
-	"tutuplapak-core/repositories"
+	"github.com/teammachinist/tutuplapak/internal/database"
+	"github.com/teammachinist/tutuplapak/services/core/models"
+	"github.com/teammachinist/tutuplapak/services/core/repositories"
 
 	"github.com/google/uuid"
 )
@@ -144,7 +144,7 @@ func (s *ProductService) UpdateProduct(
 	// 	}
 	// }
 
-	updatedRow, err := s.productRepo.UpdateProduct(ctx, db.UpdateProductParams{
+	updatedRow, err := s.productRepo.UpdateProduct(ctx, database.UpdateProductParams{
 		ID:        productID,
 		Name:      req.Name,
 		Category:  req.Category,

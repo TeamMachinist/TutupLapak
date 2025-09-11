@@ -3,7 +3,7 @@
 //   sqlc v1.30.0
 // source: products.sql
 
-package db
+package database
 
 import (
 	"context"
@@ -90,7 +90,7 @@ type CreateProductParams struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error) {
+func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (Products, error) {
 	row := q.db.QueryRow(ctx, createProduct,
 		arg.ID,
 		arg.Name,
@@ -103,7 +103,7 @@ func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (P
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
-	var i Product
+	var i Products
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
@@ -170,7 +170,7 @@ type GetAllProductsParams struct {
 	LimitCount  int32     `json:"limit_count"`
 }
 
-func (q *Queries) GetAllProducts(ctx context.Context, arg GetAllProductsParams) ([]Product, error) {
+func (q *Queries) GetAllProducts(ctx context.Context, arg GetAllProductsParams) ([]Products, error) {
 	rows, err := q.db.Query(ctx, getAllProducts,
 		arg.ProductID,
 		arg.Sku,
@@ -183,9 +183,9 @@ func (q *Queries) GetAllProducts(ctx context.Context, arg GetAllProductsParams) 
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Product{}
+	items := []Products{}
 	for rows.Next() {
-		var i Product
+		var i Products
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,

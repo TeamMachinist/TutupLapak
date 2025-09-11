@@ -7,11 +7,9 @@ CREATE TABLE IF NOT EXISTS products (
     sku VARCHAR(25) UNIQUE NOT NULL,
     file_id UUID NOT NULL,        
     user_id UUID NOT NULL,       
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL,  
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL   
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-
-
 
 CREATE INDEX idx_products_category ON products(category);
 CREATE INDEX idx_products_sku ON products(sku);

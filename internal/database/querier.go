@@ -2,7 +2,7 @@
 // versions:
 //   sqlc v1.30.0
 
-package db
+package database
 
 import (
 	"context"
@@ -13,9 +13,9 @@ import (
 type Querier interface {
 	CheckProductOwnership(ctx context.Context, arg CheckProductOwnershipParams) (bool, error)
 	CheckSKUExistsByUser(ctx context.Context, arg CheckSKUExistsByUserParams) (uuid.UUID, error)
-	CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error)
+	CreateProduct(ctx context.Context, arg CreateProductParams) (Products, error)
 	DeleteProduct(ctx context.Context, arg DeleteProductParams) error
-	GetAllProducts(ctx context.Context, arg GetAllProductsParams) ([]Product, error)
+	GetAllProducts(ctx context.Context, arg GetAllProductsParams) ([]Products, error)
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (UpdateProductRow, error)
 }
 

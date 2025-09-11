@@ -1,33 +1,37 @@
 package main
 
 import (
+	"context"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-	"tutuplapak-core/config"
-	"tutuplapak-core/handlers"
-	"tutuplapak-core/repositories"
-	"tutuplapak-core/services"
+
+	"github.com/teammachinist/tutuplapak/internal"
+	"github.com/teammachinist/tutuplapak/services/core/config"
+	"github.com/teammachinist/tutuplapak/services/core/handlers"
+	"github.com/teammachinist/tutuplapak/services/core/repositories"
+	"github.com/teammachinist/tutuplapak/services/core/services"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 )
 
-func healthHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status":"healthy","service":"core"}`))
-}
+// func healthHandler(w http.ResponseWriter, r *http.Request) {
+// 	w.Header().Set("Content-Type", "application/json")
+// 	w.WriteHeader(http.StatusOK)
+// 	w.Write([]byte(`{"status":"healthy","service":"core"}`))
+// }
 
 func main() {
+	ctx := context.Background()
+
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatal("Failed to load config:", err)
 	}
 
-	database, err := config.NewDatabase(cfg)
+	database, err := internal.NewDatabase(ctx, cfg.Database.DatabaseURL)
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
@@ -47,7 +51,7 @@ func main() {
 		})
 	})
 
-	productRepo := repositories.NewProductRepository(database)
+	productRepo := repositories.NewProductRepository(database.Queries)
 
 	productService := services.NewProductService(productRepo)
 

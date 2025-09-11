@@ -2,7 +2,7 @@
 // versions:
 //   sqlc v1.30.0
 
-package db
+package database
 
 import (
 	"time"
@@ -11,15 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type File struct {
-	ID           uuid.UUID          `json:"id"`
-	Uri          string             `json:"uri"`
-	ThumbnailUri *string            `json:"thumbnail_uri"`
-	UserID       uuid.UUID          `json:"user_id"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-}
-
-type Product struct {
+type Products struct {
 	ID        uuid.UUID `json:"id"`
 	Name      string    `json:"name"`
 	Category  string    `json:"category"`
@@ -32,7 +24,7 @@ type Product struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-type User struct {
+type Users struct {
 	ID                uuid.UUID          `json:"id"`
 	Email             string             `json:"email"`
 	Phone             *string            `json:"phone"`
@@ -41,4 +33,12 @@ type User struct {
 	BankAccountNumber *string            `json:"bank_account_number"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
+type UsersAuth struct {
+	ID           uuid.UUID        `json:"id"`
+	Email        *string          `json:"email"`
+	Phone        *string          `json:"phone"`
+	PasswordHash string           `json:"password_hash"`
+	CreatedAt    pgtype.Timestamp `json:"created_at"`
 }

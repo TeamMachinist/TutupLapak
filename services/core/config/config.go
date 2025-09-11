@@ -21,12 +21,13 @@ type AppConfig struct {
 }
 
 type DatabaseConfig struct {
-	Host     string
-	Port     string
-	User     string
-	Password string
-	DBName   string
-	SSLMode  string
+	Host        string
+	Port        string
+	User        string
+	Password    string
+	DBName      string
+	SSLMode     string
+	DatabaseURL string
 }
 
 type JWTConfig struct {
@@ -43,12 +44,13 @@ func Load() (*Config, error) {
 			Port: getEnv("PORT", "8002"),
 		},
 		Database: DatabaseConfig{
-			Host:     getEnv("DB_HOST", "localhost"),
-			Port:     getEnv("DB_PORT", "5432"),
-			User:     getEnv("DB_USER", "postgres"),
-			Password: getEnv("DB_PASSWORD", ""),
-			DBName:   getEnv("DB_NAME", "myapp"),
-			SSLMode:  getEnv("DB_SSL_MODE", "disable"),
+			Host:        getEnv("DB_HOST", "localhost"),
+			Port:        getEnv("DB_PORT", "5432"),
+			User:        getEnv("DB_USER", "postgres"),
+			Password:    getEnv("DB_PASSWORD", ""),
+			DBName:      getEnv("DB_NAME", "myapp"),
+			SSLMode:     getEnv("DB_SSL_MODE", "disable"),
+			DatabaseURL: getEnv("DATABASE_URL", ""),
 		},
 	}
 
