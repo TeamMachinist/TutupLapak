@@ -10,8 +10,7 @@ import (
 
 type UsersAuth struct {
 	ID           pgtype.UUID      `json:"id"`
-	Email        pgtype.Text      `json:"email"`
-	Phone        pgtype.Text      `json:"phone"`
+	Phone        string           `json:"phone"`
 	PasswordHash string           `json:"password_hash"`
 	CreatedAt    pgtype.Timestamp `json:"created_at"`
 }

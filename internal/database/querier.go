@@ -11,14 +11,10 @@ import (
 )
 
 type Querier interface {
-	CheckEmailExists(ctx context.Context, email pgtype.Text) (bool, error)
-	CheckPhoneExists(ctx context.Context, phone pgtype.Text) (bool, error)
+	CheckPhoneExists(ctx context.Context, phone string) (bool, error)
 	CreateUserAuth(ctx context.Context, arg CreateUserAuthParams) (UsersAuth, error)
-	GetUserAuthByEmail(ctx context.Context, email pgtype.Text) (UsersAuth, error)
 	GetUserAuthByID(ctx context.Context, id pgtype.UUID) (UsersAuth, error)
-	GetUserAuthByPhone(ctx context.Context, phone pgtype.Text) (UsersAuth, error)
-	UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams) (UsersAuth, error)
-	UpdateUserPhone(ctx context.Context, arg UpdateUserPhoneParams) (UsersAuth, error)
+	GetUserAuthByPhone(ctx context.Context, phone string) (UsersAuth, error)
 }
 
 var _ Querier = (*Queries)(nil)
