@@ -36,8 +36,9 @@ type Users struct {
 }
 
 type UsersAuth struct {
-	ID           pgtype.UUID      `json:"id"`
-	Phone        string           `json:"phone"`
+	ID           uuid.UUID        `json:"id"`
+	Email        *string          `json:"email"`
+	Phone        *string          `json:"phone"`
 	PasswordHash string           `json:"password_hash"`
 	CreatedAt    pgtype.Timestamp `json:"created_at"`
 }

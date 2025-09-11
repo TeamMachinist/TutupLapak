@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -46,6 +47,7 @@ func (h *UserHandler) LoginByPhone(c *gin.Context) {
 }
 
 func (h *UserHandler) RegisterByPhone(c *gin.Context) {
+	fmt.Println("Handler: RegisterByPhone")
 	var req RegisterPhoneRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})

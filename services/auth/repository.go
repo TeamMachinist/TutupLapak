@@ -16,7 +16,7 @@ func NewUserRepository(db *database.Queries) *UserRepository {
 }
 
 func (r *UserRepository) CheckPhoneExists(ctx context.Context, phone string) (bool, error) {
-	result, err := r.db.CheckPhoneExists(ctx, phone)
+	result, err := r.db.CheckPhoneExists(ctx, &phone)
 	if err != nil {
 		return false, err
 	}
@@ -24,14 +24,14 @@ func (r *UserRepository) CheckPhoneExists(ctx context.Context, phone string) (bo
 }
 
 func (r *UserRepository) GetUserByPhone(ctx context.Context, phone string) (*UserAuth, error) {
-	user, err := r.db.GetUserAuthByPhone(ctx, phone)
+	user, err := r.db.GetUserAuthByPhone(ctx, &phone)
 	if err != nil {
 		return nil, err
 	}
 
 	return &UserAuth{
-		ID:           fmt.Sprintf("%x", user.ID.Bytes),
-		Phone:        user.Phone,
+		ID:           fmt.Sprintf("%x", user.ID),
+		Phone:        *user.Phone,
 		PasswordHash: user.PasswordHash,
 		CreatedAt:    user.CreatedAt.Time,
 	}, nil
@@ -39,7 +39,7 @@ func (r *UserRepository) GetUserByPhone(ctx context.Context, phone string) (*Use
 
 func (r *UserRepository) CreateUserByPhone(ctx context.Context, phone, passwordHash string) (*UserAuth, error) {
 	params := database.CreateUserAuthParams{
-		Phone:        phone,
+		Phone:        &phone,
 		PasswordHash: passwordHash,
 	}
 
@@ -49,8 +49,8 @@ func (r *UserRepository) CreateUserByPhone(ctx context.Context, phone, passwordH
 	}
 
 	return &UserAuth{
-		ID:           fmt.Sprintf("%x", user.ID.Bytes),
-		Phone:        user.Phone,
+		ID:           fmt.Sprintf("%x", user.ID),
+		Phone:        *user.Phone,
 		PasswordHash: user.PasswordHash,
 		CreatedAt:    user.CreatedAt.Time,
 	}, nil

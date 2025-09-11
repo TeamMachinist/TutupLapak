@@ -18,7 +18,7 @@ services:
       context: ..
       dockerfile: services/auth/Dockerfile.dev
     volumes:
-      - ../services/auth:/app:cached
+      - ../services/auth:/app/services/auth:cached
     ports:
       - "${AUTH_PORT}:${AUTH_PORT}"
     environment:
@@ -34,7 +34,7 @@ services:
       context: ..
       dockerfile: services/core/Dockerfile.dev
     volumes:
-      - ../services/core:/app:cached
+      - ../services/core:/app/services/core:cached
     ports:
       - "${CORE_PORT}:${CORE_PORT}"
     environment:
@@ -74,7 +74,7 @@ services:
       - main_data:/var/lib/postgresql/data
       - ../migrations:/docker-entrypoint-initdb.d/:ro
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT}:5432"
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]

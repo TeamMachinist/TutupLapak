@@ -16,8 +16,5 @@ COPY services/core/ services/core/
 WORKDIR /app/services/core
 RUN go mod download
 
-# Change working directory to /app for volume mount
-WORKDIR /app
-
 # Default command
 CMD ["air"]

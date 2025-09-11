@@ -3,13 +3,11 @@ package main
 import (
 	"context"
 	"errors"
-	"net/http"
 	"regexp"
 	"strings"
-	"time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/teammachinist/tutuplapak/internal"
+
 	"github.com/jackc/pgconn"
 )
 
@@ -18,60 +16,15 @@ var (
 	ErrExpiredToken = errors.New("token has expired")
 )
 
-type Claims struct {
-	UserID string `json:"user_id"`
-	jwt.RegisteredClaims
-}
-
-type JWTService struct {
-	secretKey string
-}
-
-func NewJWTService() *JWTService {
-	return &JWTService{
-		secretKey: "your-secret-key",
-	}
-}
-
-func (j *JWTService) GenerateToken(userID string) (string, error) {
-	claims := Claims{
-		UserID: userID,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			NotBefore: jwt.NewNumericDate(time.Now()),
-		},
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(j.secretKey))
-}
-
-func (j *JWTService) ValidateToken(tokenString string) (*Claims, error) {
-	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte(j.secretKey), nil
-	})
-
-	if err != nil {
-		return nil, ErrInvalidToken
-	}
-
-	if claims, ok := token.Claims.(*Claims); ok && token.Valid {
-		return claims, nil
-	}
-
-	return nil, ErrInvalidToken
-}
-
 type UserService struct {
 	userRepo   *UserRepository
-	jwtService *JWTService
+	jwtService internal.JWTService
 }
 
-func NewUserService(userRepo *UserRepository) *UserService {
+func NewUserService(userRepo *UserRepository, jwtService internal.JWTService) *UserService {
 	return &UserService{
 		userRepo:   userRepo,
-		jwtService: NewJWTService(),
+		jwtService: jwtService,
 	}
 }
 
@@ -190,44 +143,4 @@ func (s *UserService) validatePassword(password string) error {
 	}
 
 	return nil
-}
-
-// Middleware
-func (s *UserService) AuthMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
-			c.Abort()
-			return
-		}
-
-		// Check if it starts with "Bearer "
-		if !strings.HasPrefix(authHeader, "Bearer ") {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization header format"})
-			c.Abort()
-			return
-		}
-
-		// Extract token
-		token := strings.TrimPrefix(authHeader, "Bearer ")
-		if token == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token is required"})
-			c.Abort()
-			return
-		}
-
-		// Validate token
-		jwtService := NewJWTService()
-		claims, err := jwtService.ValidateToken(token)
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
-			c.Abort()
-			return
-		}
-
-		// Set user ID in context
-		c.Set("user_id", claims.UserID)
-		c.Next()
-	}
 }

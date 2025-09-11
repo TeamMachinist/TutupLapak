@@ -8,6 +8,7 @@ package database
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -15,7 +16,7 @@ const checkPhoneExists = `-- name: CheckPhoneExists :one
 SELECT EXISTS(SELECT 1 FROM users_auth WHERE phone = $1) as exists
 `
 
-func (q *Queries) CheckPhoneExists(ctx context.Context, phone string) (bool, error) {
+func (q *Queries) CheckPhoneExists(ctx context.Context, phone *string) (bool, error) {
 	row := q.db.QueryRow(ctx, checkPhoneExists, phone)
 	var exists bool
 	err := row.Scan(&exists)
@@ -29,13 +30,20 @@ RETURNING id, phone, password_hash, created_at
 `
 
 type CreateUserAuthParams struct {
-	Phone        string `json:"phone"`
-	PasswordHash string `json:"password_hash"`
+	Phone        *string `json:"phone"`
+	PasswordHash string  `json:"password_hash"`
 }
 
-func (q *Queries) CreateUserAuth(ctx context.Context, arg CreateUserAuthParams) (UsersAuth, error) {
+type CreateUserAuthRow struct {
+	ID           uuid.UUID        `json:"id"`
+	Phone        *string          `json:"phone"`
+	PasswordHash string           `json:"password_hash"`
+	CreatedAt    pgtype.Timestamp `json:"created_at"`
+}
+
+func (q *Queries) CreateUserAuth(ctx context.Context, arg CreateUserAuthParams) (CreateUserAuthRow, error) {
 	row := q.db.QueryRow(ctx, createUserAuth, arg.Phone, arg.PasswordHash)
-	var i UsersAuth
+	var i CreateUserAuthRow
 	err := row.Scan(
 		&i.ID,
 		&i.Phone,
@@ -51,9 +59,16 @@ FROM users_auth
 WHERE id = $1
 `
 
-func (q *Queries) GetUserAuthByID(ctx context.Context, id pgtype.UUID) (UsersAuth, error) {
+type GetUserAuthByIDRow struct {
+	ID           uuid.UUID        `json:"id"`
+	Phone        *string          `json:"phone"`
+	PasswordHash string           `json:"password_hash"`
+	CreatedAt    pgtype.Timestamp `json:"created_at"`
+}
+
+func (q *Queries) GetUserAuthByID(ctx context.Context, id uuid.UUID) (GetUserAuthByIDRow, error) {
 	row := q.db.QueryRow(ctx, getUserAuthByID, id)
-	var i UsersAuth
+	var i GetUserAuthByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.Phone,
@@ -69,9 +84,16 @@ FROM users_auth
 WHERE phone = $1
 `
 
-func (q *Queries) GetUserAuthByPhone(ctx context.Context, phone string) (UsersAuth, error) {
+type GetUserAuthByPhoneRow struct {
+	ID           uuid.UUID        `json:"id"`
+	Phone        *string          `json:"phone"`
+	PasswordHash string           `json:"password_hash"`
+	CreatedAt    pgtype.Timestamp `json:"created_at"`
+}
+
+func (q *Queries) GetUserAuthByPhone(ctx context.Context, phone *string) (GetUserAuthByPhoneRow, error) {
 	row := q.db.QueryRow(ctx, getUserAuthByPhone, phone)
-	var i UsersAuth
+	var i GetUserAuthByPhoneRow
 	err := row.Scan(
 		&i.ID,
 		&i.Phone,

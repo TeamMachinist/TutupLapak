@@ -8,21 +8,19 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
+	CheckPhoneExists(ctx context.Context, phone *string) (bool, error)
 	CheckProductOwnership(ctx context.Context, arg CheckProductOwnershipParams) (bool, error)
 	CheckSKUExistsByUser(ctx context.Context, arg CheckSKUExistsByUserParams) (uuid.UUID, error)
 	CreateProduct(ctx context.Context, arg CreateProductParams) (Products, error)
+	CreateUserAuth(ctx context.Context, arg CreateUserAuthParams) (CreateUserAuthRow, error)
 	DeleteProduct(ctx context.Context, arg DeleteProductParams) error
 	GetAllProducts(ctx context.Context, arg GetAllProductsParams) ([]Products, error)
+	GetUserAuthByID(ctx context.Context, id uuid.UUID) (GetUserAuthByIDRow, error)
+	GetUserAuthByPhone(ctx context.Context, phone *string) (GetUserAuthByPhoneRow, error)
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (UpdateProductRow, error)
-	CheckEmailExists(ctx context.Context, email pgtype.Text) (bool, error)
-	CheckPhoneExists(ctx context.Context, phone pgtype.Text) (bool, error)
-	CreateUserAuth(ctx context.Context, arg CreateUserAuthParams) (UsersAuth, error)
-	GetUserAuthByID(ctx context.Context, id pgtype.UUID) (UsersAuth, error)
-	GetUserAuthByPhone(ctx context.Context, phone string) (UsersAuth, error)
 }
 
 var _ Querier = (*Queries)(nil)
