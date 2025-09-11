@@ -29,7 +29,7 @@ func NewAuthService(authRepo *repository.AuthRepository, cache *cache.Redis, jwt
 
 // RegisterNewUser optimized for performance with value passing
 // Uses stack allocation for better cache locality and reduced GC pressure
-func (s *AuthService) RegisterWithEmail(ctx context.Context, model.EmailAuthRequest) (model.AuthResponse, error) {
+func (s *AuthService) RegisterWithEmail(ctx context.Context, payload model.EmailAuthRequest) (model.AuthResponse, error) {
 	// Early context check to avoid unnecessary work
 	select {
 	case <-ctx.Done():
