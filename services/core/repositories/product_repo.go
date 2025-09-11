@@ -13,9 +13,12 @@ import (
 )
 
 type ProductRepositoryInterface interface {
-	CreateProduct(ctx context.Context, req models.CreateProductRequest) (models.ProductResponse, error)
-	CheckSKUExistsByUser(ctx context.Context, sku string, userID uuid.UUID) (bool, error)
-	GetAllProducts(ctx context.Context, params GetAllProductsParams) ([]models.Product, error)
+	CreateProduct(ctx context.Context, req models.ProductRequest) (models.ProductResponse, error)
+	CheckSKUExistsByUser(ctx context.Context, sku string, userID uuid.UUID) (uuid.UUID, error)
+	GetAllProducts(ctx context.Context, params models.GetAllProductsParams) ([]models.Product, error)
+	UpdateProduct(ctx context.Context, params db.UpdateProductParams) (db.UpdateProductRow, error)
+	CheckProductOwnership(ctx context.Context, productID uuid.UUID, userID uuid.UUID) (bool, error)
+	DeleteProduct(ctx context.Context, productID uuid.UUID, userID uuid.UUID) error
 }
 
 type ProductRepository struct {
@@ -26,8 +29,8 @@ func NewProductRepository(database *config.Database) ProductRepositoryInterface 
 	return &ProductRepository{db: database}
 }
 
-func (r *ProductRepository) CreateProduct(ctx context.Context, req models.CreateProductRequest) (models.ProductResponse, error) {
-	productID := uuid.New()
+func (r *ProductRepository) CreateProduct(ctx context.Context, req models.ProductRequest) (models.ProductResponse, error) {
+	productID := uuid.Must(uuid.NewV7())
 
 	dbProduct, err := r.db.Queries.CreateProduct(ctx, db.CreateProductParams{
 		ID:        productID,
@@ -38,8 +41,8 @@ func (r *ProductRepository) CreateProduct(ctx context.Context, req models.Create
 		Sku:       req.SKU,
 		FileID:    req.FileID,
 		UserID:    req.UserID,
-		CreatedAt: time.Now().UTC(), // ✅ WAJIB diisi dari Go
-		UpdatedAt: time.Now().UTC(), // ✅ WAJIB diisi dari Go
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
 	})
 	if err != nil {
 		return models.ProductResponse{}, err
@@ -62,27 +65,18 @@ func (r *ProductRepository) CreateProduct(ctx context.Context, req models.Create
 	return resp, nil
 }
 
-func (r *ProductRepository) CheckSKUExistsByUser(ctx context.Context, sku string, userID uuid.UUID) (bool, error) {
-	exists, err := r.db.Queries.CheckSKUExistsByUser(ctx, db.CheckSKUExistsByUserParams{
+func (r *ProductRepository) CheckSKUExistsByUser(ctx context.Context, sku string, userID uuid.UUID) (uuid.UUID, error) {
+	productID, err := r.db.Queries.CheckSKUExistsByUser(ctx, db.CheckSKUExistsByUserParams{
 		Sku:    sku,
 		UserID: userID,
 	})
 	if err != nil {
-		return false, err
+		return uuid.Nil, err
 	}
-	return exists, nil
+	return productID, nil
 }
 
-type GetAllProductsParams struct {
-	Limit     int
-	Offset    int
-	ProductID *uuid.UUID
-	SKU       *string
-	Category  *string
-	SortBy    *string
-}
-
-func (r *ProductRepository) GetAllProducts(ctx context.Context, params GetAllProductsParams) ([]models.Product, error) {
+func (r *ProductRepository) GetAllProducts(ctx context.Context, params models.GetAllProductsParams) ([]models.Product, error) {
 	limit := int32(5)
 	if params.Limit > 0 {
 		limit = int32(params.Limit)
@@ -94,64 +88,78 @@ func (r *ProductRepository) GetAllProducts(ctx context.Context, params GetAllPro
 	}
 
 	args := db.GetAllProductsParams{
-		Column4: limit,
-		Column5: offset,
+		LimitCount:  limit,
+		OffsetCount: offset,
+		ProductID:   uuid.Nil,
+		Sku:         "",
+		Category:    "",
+		SortBy:      "newest",
 	}
 
-	// Untuk ProductID: jika nil → biarkan Column1 = nil (default)
-	// Jika tidak nil → assign nilai UUID
 	if params.ProductID != nil {
-		args.Column1 = *params.ProductID // assign uuid.UUID
-	} // else: biarkan nil → NULLIF(nil, ...) → NULL → COALESCE → p.id = p.id
+		args.ProductID = *params.ProductID
+	}
 
-	// Untuk SKU: jika nil → assign "" (sentinel)
-	// Jika tidak nil → assign nilai string
 	if params.SKU != nil {
-		args.Column2 = *params.SKU
-	} else {
-		args.Column2 = "" // sentinel untuk NULLIF
+		args.Sku = *params.SKU
 	}
 
-	// Untuk Category: jika nil → assign ""
-	// Jika tidak nil → assign nilai string
 	if params.Category != nil {
-		args.Column3 = *params.Category
-	} else {
-		args.Column3 = "" // sentinel untuk NULLIF
+		args.Category = *params.Category
 	}
-
-	// Untuk SortBy: jika nil → assign ""
-	// Jika tidak nil → assign nilai string
 	if params.SortBy != nil {
-		args.Column6 = *params.SortBy
-	} else {
-		args.Column6 = "" // default sort (created_at DESC)
+		args.SortBy = *params.SortBy
 	}
 
-	log.Printf("Query Args: %+v", args) // Debug log
+	log.Printf("Query Args: %+v", args)
 
 	rows, err := r.db.Queries.GetAllProducts(ctx, args)
 	if err != nil {
 		return nil, err
 	}
 
-	var products []models.Product
-	for _, row := range rows {
-		products = append(products, models.Product{
-			ID:        row.ID,
-			Name:      row.Name,
-			Category:  row.Category,
-			Qty:       int(row.Qty),
-			Price:     int(row.Price),
-			SKU:       row.Sku,
-			FileID:    row.FileID,
-			UserID:    row.UserID,
-			CreatedAt: row.CreatedAt,
-			UpdatedAt: row.UpdatedAt,
-		})
+	products := make([]models.Product, len(rows))
+	for i, row := range rows {
+		products[i] = models.Product{
+			ID:               row.ID,
+			Name:             row.Name,
+			Category:         row.Category,
+			Qty:              int(row.Qty),
+			Price:            int(row.Price),
+			SKU:              row.Sku,
+			FileID:           row.FileID,
+			FileURI:          "",
+			FileThumbnailURI: "",
+			UserID:           row.UserID,
+			CreatedAt:        row.CreatedAt,
+			UpdatedAt:        row.UpdatedAt,
+		}
 	}
 
-	log.Printf("Retrieved %d products", len(products)) // Debug log
-
+	log.Printf("Retrieved %d products", len(products))
 	return products, nil
+}
+
+func (r *ProductRepository) UpdateProduct(ctx context.Context, params db.UpdateProductParams) (db.UpdateProductRow, error) {
+	return r.db.Queries.UpdateProduct(ctx, params)
+}
+
+func (r *ProductRepository) CheckProductOwnership(ctx context.Context, productID uuid.UUID, userID uuid.UUID) (bool, error) {
+	result, err := r.db.Queries.CheckProductOwnership(ctx, db.CheckProductOwnershipParams{
+		ProductID: productID,
+		UserID:    userID,
+	})
+	if err != nil {
+		return false, err
+	}
+
+	return result, nil
+}
+
+func (r *ProductRepository) DeleteProduct(ctx context.Context, productID uuid.UUID, userID uuid.UUID) error {
+	err := r.db.Queries.DeleteProduct(ctx, db.DeleteProductParams{
+		ID:     productID,
+		UserID: userID,
+	})
+	return err
 }

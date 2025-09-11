@@ -21,7 +21,7 @@ type Product struct {
 	UpdatedAt        time.Time `json:"updatedAt"`
 }
 
-type CreateProductRequest struct {
+type ProductRequest struct {
 	Name     string    `json:"name" validate:"required,min=4,max=32"`
 	Category string    `json:"category" validate:"required"`
 	Qty      int       `json:"qty" validate:"required,min=1"`
@@ -45,11 +45,11 @@ type ProductResponse struct {
 	UpdatedAt        time.Time `json:"updatedAt"`
 }
 
-type ListProductsRequest struct {
-	ProductID *uuid.UUID `json:"product_id,omitempty"`
-	SKU       string     `json:"sku,omitempty"`
-	Category  string     `json:"category,omitempty"`
-	SortBy    string     `json:"sort_by,omitempty"`
-	Limit     int        `json:"limit,omitempty"`
-	Offset    int        `json:"offset,omitempty"`
+type GetAllProductsParams struct {
+	Limit     int
+	Offset    int
+	ProductID *uuid.UUID
+	SKU       *string
+	Category  *string
+	SortBy    *string
 }

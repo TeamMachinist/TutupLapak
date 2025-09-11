@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -45,26 +47,20 @@ func (h *ProductHandler) GetAllProducts(c *fiber.Ctx) error {
 		}
 	}
 
-	// Parse productId — ignore if invalid
 	if pidStr := c.Query("productId"); pidStr != "" {
 		if pid, err := uuid.Parse(pidStr); err == nil {
 			productID = &pid
 		}
-		// Jika error parsing UUID, biarkan nil → akan diabaikan di repo
 	}
 
-	// Parse sku — ignore if invalid
 	if s := c.Query("sku"); s != "" {
 		sku = &s
 	}
 
-	// Parse category — ignore if invalid
-	// Optional: tambahkan validasi enum jika ada daftar kategori tetap
 	if cat := c.Query("category"); cat != "" {
 		category = &cat
 	}
 
-	// Parse sortBy — hanya terima nilai valid
 	if sb := c.Query("sortBy"); sb != "" {
 		validSorts := map[string]bool{
 			"newest":    true,
@@ -76,11 +72,9 @@ func (h *ProductHandler) GetAllProducts(c *fiber.Ctx) error {
 			lower := strings.ToLower(sb)
 			sortBy = &lower
 		}
-		// Jika tidak valid, biarkan nil → akan diabaikan (default sort by created_at DESC)
 	}
 
-	// Panggil service
-	filter := services.GetAllProductsFilter{
+	filter := models.GetAllProductsParams{
 		Limit:     limit,
 		Offset:    offset,
 		ProductID: productID,
@@ -96,12 +90,17 @@ func (h *ProductHandler) GetAllProducts(c *fiber.Ctx) error {
 		})
 	}
 
-	// Return langsung slice ProductResponse
+	if len(products) == 0 {
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{
+			"message": "no products found",
+		})
+	}
+
 	return c.Status(fiber.StatusOK).JSON(products)
 }
 
 func (h *ProductHandler) CreateProduct(c *fiber.Ctx) error {
-	var req models.CreateProductRequest
+	var req models.ProductRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid JSON payload",
@@ -187,7 +186,7 @@ func getJSONTagName(fieldPath string) string {
 	}
 	fieldName := parts[len(parts)-1]
 
-	t := reflect.TypeOf(models.CreateProductRequest{})
+	t := reflect.TypeOf(models.ProductRequest{})
 	if f, ok := t.FieldByName(fieldName); ok {
 		jsonTag := f.Tag.Get("json")
 		if jsonTag != "" && jsonTag != "-" {
@@ -198,4 +197,138 @@ func getJSONTagName(fieldPath string) string {
 		}
 	}
 	return fieldName
+}
+
+// UpdateProduct menangani PUT /products/:productId
+func (h *ProductHandler) UpdateProduct(c *fiber.Ctx) error {
+	ctx := c.Context()
+
+	productIDStr := c.Params("productId")
+	productID, err := uuid.Parse(productIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid product id format",
+		})
+	}
+
+	// // 2. Ambil userID dari JWT (diset di middleware)
+	// userID, ok := c.Locals("userID").(uuid.UUID)
+	// if !ok {
+	// 	return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+	// 		"error": "unauthorized: user not authenticated",
+	// 	})
+	// }
+
+	var req models.ProductRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid request body",
+		})
+	}
+	userID := uuid.MustParse("11111111-1111-1111-1111-111111111111") // UUID dummy valid
+
+	validate := validator.New()
+
+	validate.RegisterValidation("category_enum", func(fl validator.FieldLevel) bool {
+		category := fl.Field().String()
+		allowed := map[string]bool{
+			"Food":      true,
+			"Beverage":  true,
+			"Clothes":   true,
+			"Furniture": true,
+			"Tools":     true,
+		}
+		return allowed[category]
+	})
+
+	if err := validate.Struct(req); err != nil {
+		var details []string
+		for _, ve := range err.(validator.ValidationErrors) {
+			fieldName := getJSONTagName(ve.StructNamespace())
+			switch ve.Tag() {
+			case "required":
+				details = append(details, fieldName+" is required")
+			case "min":
+				details = append(details, fieldName+" must be at least "+ve.Param())
+			case "max":
+				details = append(details, fieldName+" must be at most "+ve.Param())
+			case "category_enum":
+				details = append(details, fieldName+" must be one of: Food, Beverage, Clothes, Furniture, Tools")
+			default:
+				details = append(details, fieldName+" is not valid")
+			}
+		}
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error":   "Validation error",
+			"details": details,
+		})
+	}
+
+	resp, err := h.productService.UpdateProduct(ctx, productID, req, userID)
+	if err != nil {
+		// Handle error langsung dengan errors.Is atau string match
+		switch {
+		case errors.Is(err, context.Canceled):
+			return c.Status(fiber.StatusRequestTimeout).JSON(fiber.Map{"error": "request timeout"})
+		case errors.Is(err, context.DeadlineExceeded):
+			return c.Status(fiber.StatusRequestTimeout).JSON(fiber.Map{"error": "request timeout"})
+		case err.Error() == "unauthorized: you don't own this product":
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
+		case err.Error() == "sku already exists for your account":
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": err.Error()})
+		case err.Error() == "file not found or invalid":
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		case err.Error() == "product not found":
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+		default:
+			c.App().Config().ErrorHandler(c, err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "internal server error",
+			})
+		}
+	}
+
+	return c.Status(fiber.StatusOK).JSON(resp)
+}
+
+func (h *ProductHandler) DeleteProduct(c *fiber.Ctx) error {
+	ctx := c.Context()
+
+	productIDStr := c.Params("productId")
+	productID, err := uuid.Parse(productIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid product id format",
+		})
+	}
+
+	// userID, ok := c.Locals("userID").(uuid.UUID)
+	// if !ok {
+	// 	return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+	// 		"error": "unauthorized: invalid or missing token",
+	// 	})
+	// }
+	userID := uuid.MustParse("11111111-1111-1111-1111-111111111111") // UUID dummy valid
+
+	err = h.productService.DeleteProduct(ctx, productID, userID)
+	if err != nil {
+		switch {
+		case err.Error() == "unauthorized: you don't own this product":
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		case strings.Contains(err.Error(), "no rows in result set"):
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "product not found",
+			})
+		default:
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "internal server error",
+			})
+		}
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "product deleted successfully",
+	})
 }

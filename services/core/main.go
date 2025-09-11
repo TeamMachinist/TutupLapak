@@ -59,6 +59,8 @@ func main() {
 	{
 		products.Get("", productHandler.GetAllProducts)
 		products.Post("", productHandler.CreateProduct)
+		products.Put("/:productId", productHandler.UpdateProduct)
+		products.Delete("/:productId", productHandler.DeleteProduct)
 
 	}
 
