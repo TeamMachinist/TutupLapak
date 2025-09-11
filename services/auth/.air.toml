@@ -1,4 +1,4 @@
-root = "."
+root = "services/auth"
 testdata_dir = "testdata"
 tmp_dir = "tmp"
 

@@ -1,18 +1,23 @@
 FROM golang:1.25-alpine
 
-# Install air for hot reloading
+# Install Air for live reload
 RUN go install github.com/air-verse/air@latest
 
 WORKDIR /app
 
-# Copy everything from root context
-COPY . .
+# Copy root go.mod and internal/ first (context is root directory)
+COPY go.mod go.sum ./
+COPY internal/ internal/
 
-# Move to service directory
+# Copy service directory
+COPY services/core/ services/core/
+
+# Move to service directory and download dependencies
 WORKDIR /app/services/core
-
-# Download dependencies
 RUN go mod download
 
-# Default command - use air for hot reloading
+# Change working directory to /app for volume mount
+WORKDIR /app
+
+# Default command
 CMD ["air"]
