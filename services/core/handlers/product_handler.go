@@ -58,7 +58,16 @@ func (h *ProductHandler) GetAllProducts(c *fiber.Ctx) error {
 	}
 
 	if cat := c.Query("category"); cat != "" {
-		category = &cat
+		allowedCategories := map[string]bool{
+			"Food":      true,
+			"Beverage":  true,
+			"Clothes":   true,
+			"Furniture": true,
+			"Tools":     true,
+		}
+		if allowedCategories[cat] {
+			category = &cat
+		}
 	}
 
 	if sb := c.Query("sortBy"); sb != "" {
