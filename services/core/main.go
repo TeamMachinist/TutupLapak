@@ -17,12 +17,6 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 )
 
-// func healthHandler(w http.ResponseWriter, r *http.Request) {
-// 	w.Header().Set("Content-Type", "application/json")
-// 	w.WriteHeader(http.StatusOK)
-// 	w.Write([]byte(`{"status":"healthy","service":"core"}`))
-// }
-
 func main() {
 	ctx := context.Background()
 
