@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -77,14 +78,14 @@ func (r *ProductRepository) CheckSKUExistsByUser(ctx context.Context, sku string
 }
 
 func (r *ProductRepository) GetAllProducts(ctx context.Context, params models.GetAllProductsParams) ([]models.Product, error) {
-	limit := 5
+	limit := int32(5)
 	if params.Limit > 0 {
-		limit = params.Limit
+		limit = int32(params.Limit)
 	}
 
-	offset := 0
+	offset := int32(0)
 	if params.Offset >= 0 {
-		offset = params.Offset
+		offset = int32(params.Offset)
 	}
 
 	args := db.GetAllProductsParams{
@@ -115,6 +116,7 @@ func (r *ProductRepository) GetAllProducts(ctx context.Context, params models.Ge
 
 	rows, err := r.db.Queries.GetAllProducts(ctx, args)
 	if err != nil {
+		fmt.Println("Error fetching products:", err)
 		return nil, err
 	}
 
@@ -124,8 +126,8 @@ func (r *ProductRepository) GetAllProducts(ctx context.Context, params models.Ge
 			ID:               row.ID,
 			Name:             row.Name,
 			Category:         row.Category,
-			Qty:              int(row.Qty),
-			Price:            int(row.Price),
+			Qty:              row.Qty,
+			Price:            row.Price,
 			SKU:              row.Sku,
 			FileID:           row.FileID,
 			FileURI:          "",

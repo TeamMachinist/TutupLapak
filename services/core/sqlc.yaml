@@ -25,5 +25,5 @@ sql:
             go_type: "int"
           - column: "products.price"
             go_type: "int"
-          - db_type: "int111"
+          - db_type: "intcustom"
             go_type: "int"

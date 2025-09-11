@@ -54,15 +54,15 @@ ORDER BY
     CASE WHEN @sort_by::text = 'cheapest' THEN p.price END ASC,
     CASE WHEN @sort_by::text = 'expensive' THEN p.price END DESC,
     p.created_at DESC
-LIMIT COALESCE(@limit_count::int111, 5)
-OFFSET COALESCE(@offset_count::int111, 0);
+LIMIT COALESCE(@limit_count::int, 5)
+OFFSET COALESCE(@offset_count::int, 0);
 
 -- name: UpdateProduct :one
 UPDATE products SET
     name = COALESCE(NULLIF(@name::text, ''), name),
     category = COALESCE(NULLIF(@category::text, ''), category),
-    qty = COALESCE(@qty::int111, qty),
-    price = COALESCE(@price::int111, price),
+    qty = COALESCE(@qty, qty),
+    price = COALESCE(@price, price),
     sku = COALESCE(NULLIF(@sku::text, ''), sku),
     file_id = COALESCE(NULLIF(@file_id::uuid, '00000000-0000-0000-0000-000000000000'::uuid), file_id),
     updated_at = @updated_at

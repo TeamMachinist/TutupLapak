@@ -157,8 +157,8 @@ ORDER BY
     CASE WHEN $4::text = 'cheapest' THEN p.price END ASC,
     CASE WHEN $4::text = 'expensive' THEN p.price END DESC,
     p.created_at DESC
-LIMIT COALESCE($6::int111, 5)
-OFFSET COALESCE($5::int111, 0)
+LIMIT COALESCE($6::int, 5)
+OFFSET COALESCE($5::int, 0)
 `
 
 type GetAllProductsParams struct {
@@ -166,8 +166,8 @@ type GetAllProductsParams struct {
 	Sku         string    `json:"sku"`
 	Category    string    `json:"category"`
 	SortBy      string    `json:"sort_by"`
-	OffsetCount int       `json:"offset_count"`
-	LimitCount  int       `json:"limit_count"`
+	OffsetCount int32     `json:"offset_count"`
+	LimitCount  int32     `json:"limit_count"`
 }
 
 func (q *Queries) GetAllProducts(ctx context.Context, arg GetAllProductsParams) ([]Product, error) {
@@ -212,8 +212,8 @@ const updateProduct = `-- name: UpdateProduct :one
 UPDATE products SET
     name = COALESCE(NULLIF($1::text, ''), name),
     category = COALESCE(NULLIF($2::text, ''), category),
-    qty = COALESCE($3::int111, qty),
-    price = COALESCE($4::int111, price),
+    qty = COALESCE($3, qty),
+    price = COALESCE($4, price),
     sku = COALESCE(NULLIF($5::text, ''), sku),
     file_id = COALESCE(NULLIF($6::uuid, '00000000-0000-0000-0000-000000000000'::uuid), file_id),
     updated_at = $7
