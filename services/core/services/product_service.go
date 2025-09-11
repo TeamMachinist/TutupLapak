@@ -2,8 +2,11 @@ package services
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"time"
 
+	"tutuplapak-core/internal/db"
 	"tutuplapak-core/models"
 	"tutuplapak-core/repositories"
 
@@ -11,8 +14,15 @@ import (
 )
 
 type ProductServiceInterface interface {
-	CreateProduct(ctx context.Context, req models.CreateProductRequest) (models.ProductResponse, error)
-	GetAllProducts(ctx context.Context, filter GetAllProductsFilter) ([]models.ProductResponse, error)
+	CreateProduct(ctx context.Context, req models.ProductRequest) (models.ProductResponse, error)
+	GetAllProducts(ctx context.Context, filter models.GetAllProductsParams) ([]models.ProductResponse, error)
+	UpdateProduct(
+		ctx context.Context,
+		productID uuid.UUID,
+		req models.ProductRequest,
+		userID uuid.UUID,
+	) (models.ProductResponse, error)
+	DeleteProduct(ctx context.Context, productID uuid.UUID, userID uuid.UUID) error
 }
 
 type ProductService struct {
@@ -36,7 +46,7 @@ func NewProductService(
 	}
 }
 
-func (s *ProductService) CreateProduct(ctx context.Context, req models.CreateProductRequest) (models.ProductResponse, error) {
+func (s *ProductService) CreateProduct(ctx context.Context, req models.ProductRequest) (models.ProductResponse, error) {
 	// user, err := s.userRepo.GetUserExist(ctx, req.UserID)
 	// if err != nil {
 	// 	return models.ProductResponse{}, errors.New("user not found or invalid token")
@@ -47,11 +57,8 @@ func (s *ProductService) CreateProduct(ctx context.Context, req models.CreatePro
 	// 	return models.ProductResponse{}, errors.New("file not found")
 	// }
 
-	exists, err := s.productRepo.CheckSKUExistsByUser(ctx, req.SKU, req.UserID)
-	if err != nil {
-		return models.ProductResponse{}, err
-	}
-	if exists {
+	_, err := s.productRepo.CheckSKUExistsByUser(ctx, req.SKU, req.UserID)
+	if err == nil {
 		return models.ProductResponse{}, errors.New("sku already exists")
 	}
 
@@ -66,26 +73,8 @@ func (s *ProductService) CreateProduct(ctx context.Context, req models.CreatePro
 	return productResp, nil
 }
 
-// Filter struct — tanpa pointer untuk limit/offset (selalu ada)
-type GetAllProductsFilter struct {
-	Limit     int
-	Offset    int
-	ProductID *uuid.UUID
-	SKU       *string
-	Category  *string
-	SortBy    *string
-}
-
-func (s *ProductService) GetAllProducts(ctx context.Context, filter GetAllProductsFilter) ([]models.ProductResponse, error) {
-	// Panggil repo
-	products, err := s.productRepo.GetAllProducts(ctx, repositories.GetAllProductsParams{
-		Limit:     filter.Limit,
-		Offset:    filter.Offset,
-		ProductID: filter.ProductID,
-		SKU:       filter.SKU,
-		Category:  filter.Category,
-		SortBy:    filter.SortBy,
-	})
+func (s *ProductService) GetAllProducts(ctx context.Context, filter models.GetAllProductsParams) ([]models.ProductResponse, error) {
+	products, err := s.productRepo.GetAllProducts(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -120,4 +109,96 @@ func (s *ProductService) GetAllProducts(ctx context.Context, filter GetAllProduc
 	}
 
 	return responses, nil
+}
+
+func (s *ProductService) UpdateProduct(
+	ctx context.Context,
+	productID uuid.UUID,
+	req models.ProductRequest,
+	userID uuid.UUID,
+) (models.ProductResponse, error) {
+
+	// owned, err := s.productRepo.CheckProductOwnership(ctx, productID, userID)
+	// if err != nil {
+	// 	return models.ProductResponse{}, err
+	// }
+	// if !owned {
+	// 	return models.ProductResponse{}, errors.New("unauthorized: you don't own this product")
+	// }
+
+	// ??? is this neccesaryy?
+	existingProductID, err := s.productRepo.CheckSKUExistsByUser(ctx, req.SKU, userID)
+	if err == nil {
+		if existingProductID != productID {
+			return models.ProductResponse{}, errors.New("sku already exists")
+		}
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return models.ProductResponse{}, err
+	}
+
+	// // 3. Validasi fileId jika tidak zero
+	// if req.FileID != uuid.Nil {
+	// 	_, err := s.fileClient.GetFileByID(ctx, req.FileID)
+	// 	if err != nil {
+	// 		return models.ProductResponse{}, errors.New("file not found or invalid")
+	// 	}
+	// }
+
+	updatedRow, err := s.productRepo.UpdateProduct(ctx, db.UpdateProductParams{
+		ID:        productID,
+		Name:      req.Name,
+		Category:  req.Category,
+		Qty:       int32(req.Qty),
+		Price:     int32(req.Price),
+		Sku:       req.SKU,
+		FileID:    req.FileID,
+		UpdatedAt: time.Now(),
+	})
+	if err != nil {
+		return models.ProductResponse{}, err
+	}
+
+	// 5. Mapping ke ProductResponse (by value)
+	resp := models.ProductResponse{
+		ProductID:        updatedRow.ID,
+		Name:             updatedRow.Name,
+		Category:         updatedRow.Category,
+		Qty:              int(updatedRow.Qty),
+		Price:            int(updatedRow.Price),
+		SKU:              updatedRow.Sku,
+		FileID:           updatedRow.FileID,
+		CreatedAt:        updatedRow.CreatedAt,
+		UpdatedAt:        updatedRow.UpdatedAt,
+		FileURI:          "",
+		FileThumbnailURI: "",
+	}
+
+	// // 6. Ambil metadata file jika ada
+	// if updatedRow.FileID != uuid.Nil {
+	// 	file, err := s.fileClient.GetFileByID(ctx, updatedRow.FileID)
+	// 	if err == nil {
+	// 		resp.FileURI = file.URI
+	// 		resp.FileThumbnailURI = file.ThumbnailURI
+	// 	}
+	// 	// Jika error, biarkan string kosong — tidak return error
+	// }
+
+	return resp, nil
+}
+
+func (s *ProductService) DeleteProduct(ctx context.Context, productID uuid.UUID, userID uuid.UUID) error {
+	// owned, err := s.productRepo.CheckProductOwnership(ctx, productID, userID)
+	// if err != nil {
+	// 	return err
+	// }
+	// if !owned {
+	// 	return errors.New("unauthorized: you don't own this product")
+	// }
+
+	err := s.productRepo.DeleteProduct(ctx, productID, userID)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
