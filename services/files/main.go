@@ -12,7 +12,7 @@ import (
 
 type Config struct{
 	// MinIO Configuration
-	MinIOEndpoint       string `env:"MINIO_ENDPOINT" envDefault:"minio:9000"`
+	MinIOEndpoint       string `env:"MINIO_ENDPOINT" envDefault:"localhost:9000"`
 	MinIOAccessKey      string `env:"MINIO_ACCESS_KEY" envDefault:"minioadmin"`
 	MinIOSecretKey      string `env:"MINIO_SECRET_KEY" envDefault:"minioadmin"`
 	MinIOBucket         string `env:"MINIO_BUCKET" envDefault:"tutuplapak-uploads"`

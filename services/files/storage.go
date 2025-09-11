@@ -65,13 +65,13 @@ func (s *MinIOStorage) ensureBucket() error {
 	return nil
 }
 
-func (s *MinIOStorage) UploadFile(ctx context.Context, file io.Reader, header *multipart.FileHeader) (string, error) {
+func (s *MinIOStorage) UploadFile(ctx context.Context, file io.Reader, header *multipart.FileHeader, size int64) (string, error) {
 	// Generate unique filename
 	filename := fmt.Sprintf("%d_%s", time.Now().Unix(), header.Filename)
 	objectName := filepath.Join("uploads", filename)
 
 	// Upload file
-	_, err := s.client.PutObject(ctx, s.config.BucketName, objectName, file, header.Size, minio.PutObjectOptions{
+	_, err := s.client.PutObject(ctx, s.config.BucketName, objectName, file, size, minio.PutObjectOptions{
 		ContentType: header.Header.Get("Content-Type"),
 	})
 	if err != nil {
@@ -81,3 +81,4 @@ func (s *MinIOStorage) UploadFile(ctx context.Context, file io.Reader, header *m
 	// Return public URL
 	return fmt.Sprintf("%s/%s/%s", s.config.PublicEndpoint, s.config.BucketName, objectName), nil
 }
+
