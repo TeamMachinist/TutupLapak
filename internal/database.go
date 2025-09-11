@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"tutuplapak/internal/database"
+	"github.com/teammachinist/tutuplapak/internal/database"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

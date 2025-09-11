@@ -1,29 +1,59 @@
-.PHONY: dev build down clean sqlc test
+# Rules of thumb:
+# - Use up-* commands for normal development (Air handles live reload)
+# - Use *-build commands when Dockerfile or go.mod dependencies change
+# - Use down-reset to get fresh database with migrations
+# - up-prod is for local production testing only (K8s doesn't use compose)
 
-# Development
-dev:
-	cd deployments && docker-compose -f compose.dev.yml up -d
+.PHONY: up-dev up-dev-build up-prod up-auth up-auth-build up-core up-core-build up-files up-files-build down-dev down-reset down-clean sqlc test
 
-dev-build:
-	cd deployments && docker-compose -f compose.dev.yml up --build -d
+# Start commands
+up-dev:
+	cd deployments && docker compose -f compose.dev.yml up -d
 
-# Individual services (dev)
-auth-dev:
-	cd deployments && docker-compose -f compose.dev.yml up -d nginx auth-service main-db
+up-dev-build:
+	cd deployments && docker compose -f compose.dev.yml up --build -d
 
-core-dev:
-	cd deployments && docker-compose -f compose.dev.yml up -d nginx core-service main-db
+up-prod:
+	cd deployments && docker compose up --build -d
 
-files-dev:
-	cd deployments && docker-compose -f compose.dev.yml up -d nginx files-service main-db
+# Individual services (direct access, no nginx)
+up-auth:
+	cd deployments && docker compose -f compose.dev.yml up -d auth-service main-db
 
-# Cleanup
-down:
-	cd deployments && docker-compose -f compose.dev.yml down
+up-auth-build:
+	cd deployments && docker compose -f compose.dev.yml up --build -d auth-service main-db
 
-clean:
+up-core:
+	cd deployments && docker compose -f compose.dev.yml up -d core-service main-db
+
+up-core-build:
+	cd deployments && docker compose -f compose.dev.yml up --build -d core-service main-db
+
+up-files:
+	cd deployments && docker compose -f compose.dev.yml up -d files-service main-db
+
+up-files-build:
+	cd deployments && docker compose -f compose.dev.yml up --build -d files-service main-db
+
+# Stop commands
+down-dev:
+	cd deployments && docker compose -f compose.dev.yml down
+
+down-reset:
+	cd deployments && docker compose -f compose.dev.yml down -v
+
+down-clean:
+	cd deployments && docker compose -f compose.dev.yml down -v
+	docker container prune -f
+	docker volume prune -f
 	docker system prune -f
 
-# Database
+# Database  
 sqlc:
 	sqlc generate
+
+# Testing
+test:
+	curl -s http://localhost/healthz/auth || echo "Auth service down"
+	curl -s http://localhost/healthz/core || echo "Core service down"  
+	curl -s http://localhost/healthz/files || echo "Files service down"

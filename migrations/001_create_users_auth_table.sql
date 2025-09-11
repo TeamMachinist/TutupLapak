@@ -1,5 +1,5 @@
 CREATE TABLE users_auth (
-    id SERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email VARCHAR(255) UNIQUE,
     phone VARCHAR(20) UNIQUE,
     password_hash VARCHAR(255) NOT NULL,

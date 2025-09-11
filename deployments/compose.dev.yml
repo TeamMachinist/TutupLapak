@@ -15,11 +15,10 @@ services:
   # Auth Service
   auth-service:
     build:
-      context: ../services/auth
-      dockerfile: Dockerfile.dev
+      context: ..
+      dockerfile: services/auth/Dockerfile.dev
     volumes:
       - ../services/auth:/app:cached
-      - /app/tmp
     ports:
       - "${AUTH_PORT}:${AUTH_PORT}"
     environment:
@@ -32,11 +31,10 @@ services:
   # Core Service
   core-service:
     build:
-      context: ../services/core
-      dockerfile: Dockerfile.dev
+      context: ..
+      dockerfile: services/core/Dockerfile.dev
     volumes:
       - ../services/core:/app:cached
-      - /app/tmp
     ports:
       - "${CORE_PORT}:${CORE_PORT}"
     environment:
@@ -51,11 +49,10 @@ services:
   # Files Service
   files-service:
     build:
-      context: ../services/files
-      dockerfile: Dockerfile.dev
+      context: ..
+      dockerfile: services/files/Dockerfile.dev
     volumes:
-      - ../services/files:/app:cached
-      - /app/tmp
+      - ../services/files:/app/services/files:cached
     ports:
       - "${FILES_PORT}:${FILES_PORT}"
     environment:
