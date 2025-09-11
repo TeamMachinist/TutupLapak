@@ -1,7 +1,2 @@
 .env
-database
-internal
 cache
-
-compose.yml
-sqlc.yaml

@@ -36,8 +36,8 @@ func (r *ProductRepository) CreateProduct(ctx context.Context, req models.Produc
 		ID:        productID,
 		Name:      req.Name,
 		Category:  req.Category,
-		Qty:       int32(req.Qty),
-		Price:     int32(req.Price),
+		Qty:       req.Qty,
+		Price:     req.Price,
 		Sku:       req.SKU,
 		FileID:    req.FileID,
 		UserID:    req.UserID,
@@ -77,14 +77,14 @@ func (r *ProductRepository) CheckSKUExistsByUser(ctx context.Context, sku string
 }
 
 func (r *ProductRepository) GetAllProducts(ctx context.Context, params models.GetAllProductsParams) ([]models.Product, error) {
-	limit := int32(5)
+	limit := 5
 	if params.Limit > 0 {
-		limit = int32(params.Limit)
+		limit = params.Limit
 	}
 
-	offset := int32(0)
+	offset := 0
 	if params.Offset >= 0 {
-		offset = int32(params.Offset)
+		offset = params.Offset
 	}
 
 	args := db.GetAllProductsParams{
