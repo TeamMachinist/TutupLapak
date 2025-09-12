@@ -11,6 +11,14 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Files struct {
+	ID               uuid.UUID          `json:"id"`
+	UserID           uuid.UUID          `json:"user_id"`
+	FileUri          string             `json:"file_uri"`
+	FileThumbnailUri string             `json:"file_thumbnail_uri"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+}
+
 type Products struct {
 	ID        uuid.UUID `json:"id"`
 	Name      string    `json:"name"`
@@ -26,7 +34,9 @@ type Products struct {
 
 type Users struct {
 	ID                uuid.UUID          `json:"id"`
-	Email             string             `json:"email"`
+	UserAuthID        uuid.UUID          `json:"user_auth_id"`
+	FileID            pgtype.UUID        `json:"file_id"`
+	Email             *string            `json:"email"`
 	Phone             *string            `json:"phone"`
 	BankAccountName   *string            `json:"bank_account_name"`
 	BankAccountHolder *string            `json:"bank_account_holder"`
