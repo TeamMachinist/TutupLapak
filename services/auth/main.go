@@ -58,7 +58,7 @@ func main() {
 	jwtService := internal.NewJWTService(jwtConfig)
 
 	// Initialize cache
-	cache := NewCacheService(redisURL)
+	cache := internal.NewCacheService(redisURL)
 	defer cache.Close()
 
 	// Initialize layers
