@@ -6,7 +6,6 @@ import (
 	"io"
 	"mime/multipart"
 	"path/filepath"
-	"time"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -65,9 +64,8 @@ func (s *MinIOStorage) ensureBucket() error {
 	return nil
 }
 
-func (s *MinIOStorage) UploadFile(ctx context.Context, file io.Reader, header *multipart.FileHeader, size int64) (string, error) {
+func (s *MinIOStorage) UploadFile(ctx context.Context, file io.Reader, header *multipart.FileHeader, size int64, filename string) (string, error) {
 	// Generate unique filename
-	filename := fmt.Sprintf("%d_%s", time.Now().Unix(), header.Filename)
 	objectName := filepath.Join("uploads", filename)
 
 	// Upload file

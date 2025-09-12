@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/caarlos0/env"
 	"github.com/go-chi/chi/v5"
@@ -11,6 +13,9 @@ import (
 )
 
 type Config struct{
+
+	HTTPPort string `env:"HTTP_PORT" envDefault:"8080"`
+	DatabaseURL string `env:"DATABASE_URL"`
 	// MinIO Configuration
 	MinIOEndpoint       string `env:"MINIO_ENDPOINT" envDefault:"localhost:9000"`
 	MinIOAccessKey      string `env:"MINIO_ACCESS_KEY" envDefault:"minioadmin"`
@@ -28,13 +33,20 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	// Add miniO
-	// Add Repo, Service, and Handler
-	// Add upload image function
+
 	cfg := Config{}
+	
 	if err := env.Parse(&cfg); err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	db, err := NewDatabase(ctx, cfg.DatabaseURL)
+	if err != nil{
+		log.Fatal("Failed to connect the database:", err)
+	}
+	
 
 	// Initialize MinIO storage
 	minioConfig := &MinIOConfig{
@@ -51,18 +63,23 @@ func main() {
 		log.Fatal("Failed to initialize MinIO storage:", err)
 	}
 
-	fileHandler := NewFileHandler(minioStorage)
+	fileRepo := NewFileRepository(db.Queries)
+	fileService := NewFileService(db.Queries, fileRepo)
+	fileHandler := NewFileHandler(minioStorage, fileService)
 	
 	r := chi.NewRouter()
 
 	fs := http.FileServer(http.Dir("static"))
 	r.Handle("/static/*", http.StripPrefix("/static/", fs))
 
-	r.Get("/", func (w http.ResponseWriter, r *http.Request)  {
-		w.Write([]byte("hi"))
+	r.Route("/api/v1/", func(r chi.Router) {
+		r.Get("/", fileHandler.ListFiles)
+		r.Post("/file", fileHandler.UploadFile)
+		r.Get("/file/{fileid}", fileHandler.GetFiles)
+		r.Delete("/file/{fileid}", fileHandler.DeleteFiles)
+
 	})
 
-	r.Post("/file", fileHandler.UploadFile)
 	r.Get("/healthz", healthHandler)
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -73,4 +90,5 @@ func main() {
 	
 	
 	log.Fatal(http.ListenAndServe(":"+port, r))
+	db.Close()
 }
