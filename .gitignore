@@ -40,3 +40,6 @@ tmp/
 # OS
 .DS_Store
 Thumbs.db
+
+# Others
+dev-note.md
