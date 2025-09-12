@@ -5,11 +5,55 @@
 package database
 
 import (
+	"database/sql/driver"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+type PurchaseStatus string
+
+const (
+	PurchaseStatusUnpaid PurchaseStatus = "unpaid"
+	PurchaseStatusPaid   PurchaseStatus = "paid"
+)
+
+func (e *PurchaseStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = PurchaseStatus(s)
+	case string:
+		*e = PurchaseStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for PurchaseStatus: %T", src)
+	}
+	return nil
+}
+
+type NullPurchaseStatus struct {
+	PurchaseStatus PurchaseStatus `json:"purchase_status"`
+	Valid          bool           `json:"valid"` // Valid is true if PurchaseStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullPurchaseStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.PurchaseStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.PurchaseStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullPurchaseStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.PurchaseStatus), nil
+}
 
 type Products struct {
 	ID        uuid.UUID `json:"id"`
@@ -22,6 +66,19 @@ type Products struct {
 	UserID    uuid.UUID `json:"user_id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type Purchases struct {
+	ID                  uuid.UUID          `json:"id"`
+	SenderName          string             `json:"sender_name"`
+	SenderContactType   string             `json:"sender_contact_type"`
+	SenderContactDetail string             `json:"sender_contact_detail"`
+	PurchasedItems      []byte             `json:"purchased_items"`
+	PaymentDetails      []byte             `json:"payment_details"`
+	TotalPrice          int32              `json:"total_price"`
+	Status              PurchaseStatus     `json:"status"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Users struct {

@@ -208,6 +208,40 @@ func (q *Queries) GetAllProducts(ctx context.Context, arg GetAllProductsParams) 
 	return items, nil
 }
 
+const getProductByID = `-- name: GetProductByID :one
+SELECT 
+    id,
+    name,
+    category,
+    qty,
+    price,
+    sku,
+    file_id,
+    user_id,
+    created_at,
+    updated_at
+FROM products 
+WHERE id = $1
+`
+
+func (q *Queries) GetProductByID(ctx context.Context, id uuid.UUID) (Products, error) {
+	row := q.db.QueryRow(ctx, getProductByID, id)
+	var i Products
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Category,
+		&i.Qty,
+		&i.Price,
+		&i.Sku,
+		&i.FileID,
+		&i.UserID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const updateProduct = `-- name: UpdateProduct :one
 UPDATE products SET
     name = COALESCE(NULLIF($1::text, ''), name),
@@ -268,4 +302,23 @@ func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) (U
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const updateProductQty = `-- name: UpdateProductQty :execrows
+UPDATE products 
+SET qty = qty - $2 
+WHERE id = $1
+`
+
+type UpdateProductQtyParams struct {
+	ID  uuid.UUID `json:"id"`
+	Qty int       `json:"qty"`
+}
+
+func (q *Queries) UpdateProductQty(ctx context.Context, arg UpdateProductQtyParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateProductQty, arg.ID, arg.Qty)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

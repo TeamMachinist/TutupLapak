@@ -79,3 +79,23 @@ SELECT EXISTS(
 -- name: DeleteProduct :exec
 DELETE FROM products
 WHERE id = @id::uuid AND user_id = @user_id::uuid;
+
+-- name: UpdateProductQty :execrows
+UPDATE products 
+SET qty = qty - $2 
+WHERE id = $1;
+
+-- name: GetProductByID :one
+SELECT 
+    id,
+    name,
+    category,
+    qty,
+    price,
+    sku,
+    file_id,
+    user_id,
+    created_at,
+    updated_at
+FROM products 
+WHERE id = $1;

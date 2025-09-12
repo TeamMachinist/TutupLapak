@@ -14,9 +14,13 @@ type Querier interface {
 	CheckProductOwnership(ctx context.Context, arg CheckProductOwnershipParams) (bool, error)
 	CheckSKUExistsByUser(ctx context.Context, arg CheckSKUExistsByUserParams) (uuid.UUID, error)
 	CreateProduct(ctx context.Context, arg CreateProductParams) (Products, error)
+	CreatePurchase(ctx context.Context, arg CreatePurchaseParams) error
 	DeleteProduct(ctx context.Context, arg DeleteProductParams) error
 	GetAllProducts(ctx context.Context, arg GetAllProductsParams) ([]Products, error)
+	GetProductByID(ctx context.Context, id uuid.UUID) (Products, error)
+	GetUserByID(ctx context.Context, id uuid.UUID) (Users, error)
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (UpdateProductRow, error)
+	UpdateProductQty(ctx context.Context, arg UpdateProductQtyParams) (int64, error)
 }
 
 var _ Querier = (*Queries)(nil)
