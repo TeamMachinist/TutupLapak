@@ -21,9 +21,10 @@ func (q *FileRepository) CreateFiles(ctx context.Context, payload db.CreateFiles
 	return row, nil
 }
 func (q *FileRepository) DeleteFiles(ctx context.Context, fileid string) (error){
+	
 	err := q.db.DeleteFiles(ctx, fileid)
 	if err != nil{
-		return nil
+		return err
 	}
 	return nil
 }

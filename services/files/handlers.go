@@ -29,10 +29,9 @@ func NewFileHandler(minioStorage *MinIOStorage, fileService FileService) *FileHa
 
 func (h *FileHandler) CreateFiles(w http.ResponseWriter,r *http.Request,  payload db.CreateFilesParams) {
 newFile, err := h.fileService.CreateFiles(r.Context(), payload)
-if err != nil{
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))	
-	return 
+	if err != nil{
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return 
 }
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(newFile)
@@ -43,7 +42,7 @@ func (h *FileHandler) DeleteFiles(w http.ResponseWriter,r *http.Request) {
 	fileId := chi.URLParam(r, "fileid")
 	err := h.fileService.DeleteFiles(r.Context(), fileId)
 	if err!=nil{
-
+		http.Error(w, err.Error(), http.StatusNotFound)
 		return 
 	}
 		w.WriteHeader(http.StatusOK)
@@ -54,8 +53,7 @@ func (h *FileHandler) GetFiles(w http.ResponseWriter,r *http.Request){
 	fileId := chi.URLParam(r, "fileid")
 	file, err := h.fileService.GetFiles(r.Context(), fileId)
 	if err != nil{
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))	
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return 
 	}
 		w.WriteHeader(http.StatusOK)
@@ -67,8 +65,7 @@ func (h *FileHandler) ListFiles(w http.ResponseWriter,r *http.Request){
 	
 	listFile, err := h.fileService.ListFiles(requestCtx)
 	if err != nil{
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))		
+		http.Error(w, err.Error(), http.StatusInternalServerError)		
 		return 
 	}
 	w.WriteHeader(http.StatusOK)
@@ -84,16 +81,14 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter,r *http.Request) {
 	
 	ctx := r.Context()
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("File is Required"))
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	defer file.Close()
 
 	// Validate file size (max 10MB)
 	if header.Size > 10*1024*1024 {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("File size exceeds 10MB limit"))
+		http.Error(w, "File size exceeds 10MB limit", http.StatusBadRequest)
 		return
 	}
 
@@ -110,9 +105,7 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter,r *http.Request) {
 	}
 
 	if !isValidType {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Only JPEG and PNG files are allowed"))
-		
+		http.Error(w, "File's type is incorrect", http.StatusBadRequest)
 		return
 	}
 	id := time.Now().Unix()
@@ -121,9 +114,7 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter,r *http.Request) {
 	// Upload original image to MinIO
 	uri, err := h.storage.UploadFile(ctx, file, header, header.Size, filename)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Failed to upload File"))
-		w.Write([]byte(err.Error()))
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -136,8 +127,8 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter,r *http.Request) {
 	// upload compressed image
 	compressedImage, imageSize, err := CompressImage(buffer, 10, "uploads")
 	if err !=nil{
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Failed to upload File"))
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 
 	}
 	compressedReader := bytes.NewReader(compressedImage)
@@ -147,10 +138,7 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter,r *http.Request) {
 	compressedImageUri, err := h.storage.UploadFile(ctx, compressedReader, header, imageSize, compressedImageName)
 	
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Failed to upload Compressed Image"))
-		w.Write([]byte(err.Error()))
-
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	w.WriteHeader(http.StatusOK)

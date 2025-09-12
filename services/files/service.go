@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"mime/multipart"
 	"tutuplapak-files/db"
 
@@ -32,6 +33,11 @@ return newFile, nil
 }
 
 func (s *FileService) DeleteFiles(ctx context.Context, fileId string) (error){
+	file, _ := s.userRepo.GetFiles(ctx, fileId)
+	if file == (db.File{}){
+		return fmt.Errorf("file doesn't exist")
+	}
+
 	err := s.db.DeleteFiles(ctx, fileId)
 	if err!=nil{
 		return err
