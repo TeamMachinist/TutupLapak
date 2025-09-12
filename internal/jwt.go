@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -156,6 +157,8 @@ func (j *JWTService) ChiMiddleware(next http.Handler) http.Handler {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
+
+		fmt.Println("ChiMiddleware claims.UserID:", claims.UserID)
 
 		ctx := WithUserID(r.Context(), claims.UserID)
 		next.ServeHTTP(w, r.WithContext(ctx))

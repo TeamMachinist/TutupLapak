@@ -81,8 +81,6 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("UserID:", userID)
-
 	file, header, err := r.FormFile("file")
 	ctx := r.Context()
 	if err != nil {
@@ -154,6 +152,7 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 	// Parse user ID to UUID
 	userUUID, err := uuid.Parse(userID)
 	if err != nil {
+		log.Println("error parsing user ID:", err)
 		http.Error(w, "Invalid User ID", http.StatusBadRequest)
 		return
 	}

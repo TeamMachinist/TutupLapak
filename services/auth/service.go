@@ -3,10 +3,13 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/teammachinist/tutuplapak/internal"
+	"github.com/teammachinist/tutuplapak/internal/database"
 
 	"github.com/jackc/pgconn"
 )
@@ -19,12 +22,14 @@ var (
 type UserService struct {
 	userRepo   *UserRepository
 	jwtService internal.JWTService
+	db         *database.Queries
 }
 
-func NewUserService(userRepo *UserRepository, jwtService internal.JWTService) *UserService {
+func NewUserService(userRepo *UserRepository, jwtService internal.JWTService, db *database.Queries) *UserService {
 	return &UserService{
 		userRepo:   userRepo,
 		jwtService: jwtService,
+		db:         db,
 	}
 }
 
@@ -39,25 +44,34 @@ func (s *UserService) LoginByPhone(ctx context.Context, phone, password string) 
 		return nil, err
 	}
 
-	// Get user by phone
-	user, err := s.userRepo.GetUserByPhone(ctx, phone)
+	// Validate user auth by phone
+	userAuth, err := s.userRepo.GetUserByPhone(ctx, phone)
 	if err != nil {
 		return nil, errors.New("phone not found")
 	}
 
 	// Check password
-	if !CheckPassword(password, user.PasswordHash) {
+	if !CheckPassword(password, userAuth.PasswordHash) {
 		return nil, errors.New("invalid credentials")
 	}
 
+	fmt.Println("----------------")
+	fmt.Printf("userAuth: %+v\n", userAuth)
+
+	// Get user, hit db directly for development purpose
+	user, err := s.db.GetUserByAuthID(ctx, userAuth.ID)
+
+	fmt.Printf("user: %+v\n", user)
+	fmt.Println("----------------")
+
 	// Generate JWT token
-	token, err := s.jwtService.GenerateToken(user.ID)
+	token, err := s.jwtService.GenerateToken(user.ID.String())
 	if err != nil {
 		return nil, errors.New("failed to generate token")
 	}
 
 	return &LoginResponse{
-		Phone: user.Phone,
+		Phone: userAuth.Phone,
 		Token: token,
 	}, nil
 }
@@ -86,8 +100,8 @@ func (s *UserService) RegisterByPhone(ctx context.Context, phone, password strin
 		return nil, errors.New("failed to hash password")
 	}
 
-	// Create user
-	user, err := s.userRepo.CreateUserByPhone(ctx, phone, passwordHash)
+	// Create user auth
+	userAuth, err := s.userRepo.CreateUserByPhone(ctx, phone, passwordHash)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
@@ -98,14 +112,21 @@ func (s *UserService) RegisterByPhone(ctx context.Context, phone, password strin
 		return nil, err
 	}
 
+	// Create user, hit db directly for development purpose
+	user, err := s.db.CreateUser(ctx, database.CreateUserParams{
+		ID:         uuid.New(),
+		UserAuthID: userAuth.ID,
+		Email:      &userAuth.Phone,
+	})
+
 	// Generate token
-	token, err := s.jwtService.GenerateToken(user.ID)
+	token, err := s.jwtService.GenerateToken(user.ID.String())
 	if err != nil {
 		return nil, errors.New("failed to generate token")
 	}
 
 	return &LoginResponse{
-		Phone: user.Phone,
+		Phone: *user.Phone,
 		Token: token,
 	}, nil
 }

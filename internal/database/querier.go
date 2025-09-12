@@ -16,16 +16,26 @@ type Querier interface {
 	CheckSKUExistsByUser(ctx context.Context, arg CheckSKUExistsByUserParams) (uuid.UUID, error)
 	CreateFile(ctx context.Context, arg CreateFileParams) (Files, error)
 	CreateProduct(ctx context.Context, arg CreateProductParams) (Products, error)
+	CreateUser(ctx context.Context, arg CreateUserParams) (Users, error)
 	CreateUserAuth(ctx context.Context, arg CreateUserAuthParams) (CreateUserAuthRow, error)
 	DeleteFile(ctx context.Context, id uuid.UUID) error
 	DeleteProduct(ctx context.Context, arg DeleteProductParams) error
+	DeleteUser(ctx context.Context, id uuid.UUID) error
 	GetAllProducts(ctx context.Context, arg GetAllProductsParams) ([]Products, error)
 	GetFile(ctx context.Context, id uuid.UUID) (Files, error)
 	GetFileByIDAndUserID(ctx context.Context, arg GetFileByIDAndUserIDParams) (Files, error)
 	GetFilesByUser(ctx context.Context, userID uuid.UUID) ([]Files, error)
 	GetUserAuthByID(ctx context.Context, id uuid.UUID) (GetUserAuthByIDRow, error)
 	GetUserAuthByPhone(ctx context.Context, phone *string) (GetUserAuthByPhoneRow, error)
+	GetUserByAuthID(ctx context.Context, userAuthID uuid.UUID) (Users, error)
+	GetUserByEmail(ctx context.Context, email *string) (Users, error)
+	GetUserByID(ctx context.Context, id uuid.UUID) (Users, error)
+	GetUserByPhone(ctx context.Context, phone *string) (Users, error)
+	GetUserWithAuth(ctx context.Context, id uuid.UUID) (GetUserWithAuthRow, error)
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (UpdateProductRow, error)
+	UpdateUser(ctx context.Context, arg UpdateUserParams) (Users, error)
+	UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams) (Users, error)
+	UpdateUserPhone(ctx context.Context, arg UpdateUserPhoneParams) (Users, error)
 }
 
 var _ Querier = (*Queries)(nil)

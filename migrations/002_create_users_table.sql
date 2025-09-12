@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY,
-    user_auth_id UUID NOT NULL REFERENCES users_auth(id),
+    user_auth_id UUID NOT NULL REFERENCES users_auth(id) ON DELETE CASCADE,
     file_id UUID,
     email VARCHAR(255),
     phone VARCHAR(20),
