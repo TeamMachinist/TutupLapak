@@ -89,9 +89,10 @@ func (r *PurchaseRepository) CreatePurchase(ctx context.Context, req models.Purc
 			Qty:              itemReq.Qty,
 			Price:            int(productInTx.Price),
 			SKU:              productInTx.Sku,
-			FileID:           productInTx.FileID, // ← Simpan FileID
-			FileURI:          "",                 // ← Akan diisi di service
-			FileThumbnailURI: "",                 // ← Akan diisi di service
+			FileID:           productInTx.FileID,
+			UserID:           productInTx.UserID, // ← isi untuk kebutuhan internal
+			FileURI:          "",
+			FileThumbnailURI: "",
 			CreatedAt:        now,
 			UpdatedAt:        now,
 		})

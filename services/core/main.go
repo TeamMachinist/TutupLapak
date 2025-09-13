@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/teammachinist/tutuplapak/internal"
+	"github.com/teammachinist/tutuplapak/services/core/clients"
 	"github.com/teammachinist/tutuplapak/services/core/config"
 	"github.com/teammachinist/tutuplapak/services/core/handlers"
 	"github.com/teammachinist/tutuplapak/services/core/repositories"
@@ -52,11 +53,13 @@ func main() {
 	}
 	jwtService := internal.NewJWTService(jwtConfig)
 
+	fileClient := clients.NewFileClient(cfg.App.FileUrl, jwtService)
+
 	productRepo := repositories.NewProductRepository(database.Queries)
 	purchaseRepo := repositories.NewPurchaseRepository(database.Pool)
 
-	productService := services.NewProductService(productRepo)
-	purchaseService := services.NewPurchaseService(purchaseRepo)
+	productService := services.NewProductService(productRepo, fileClient)
+	purchaseService := services.NewPurchaseService(purchaseRepo, fileClient)
 
 	productHandler := handlers.NewProductHandler(productService)
 	purchaseHandler := handlers.NewPurchaseHandler(purchaseService)
