@@ -80,6 +80,7 @@ func main() {
 	v1.POST("/register/phone", userHandler.RegisterByPhone)
 	v1.POST("/login/email", userHandler.LoginWithEmail)
 	v1.POST("/register/email", userHandler.RegisterWithEmail)
+	v1.POST("/user/link/phone", userHandler.LinkPhone)
 
 	// Simple token generation endpoint for testing
 	v1.POST("/token", func(c *gin.Context) {

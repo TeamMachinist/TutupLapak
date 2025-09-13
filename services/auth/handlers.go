@@ -133,3 +133,57 @@ func (h *UserHandler) RegisterWithEmail(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, resp)
 }
+
+func (h *UserHandler) LinkPhone(c *gin.Context) {
+	var req LinkPhoneRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
+		return
+	}
+
+	tokenString := ""
+	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+		tokenString = authHeader[7:]
+	} else if len(authHeader) > 6 && authHeader[:6] == "Barer " {
+		tokenString = authHeader[6:]
+	} else {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization header format"})
+		return
+	}
+
+	claims, err := h.userService.jwtService.ValidateToken(tokenString)
+	if err != nil {
+		switch err.Error() {
+		case "token has expired":
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token has expired"})
+		case "invalid token":
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+		default:
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		}
+		return
+	}
+
+	resp, err := h.userService.LinkPhone(c.Request.Context(), claims.UserID, req.Phone)
+	if err != nil {
+		switch err.Error() {
+		case "phone is taken":
+			c.JSON(http.StatusConflict, gin.H{"error": "Phone is taken"})
+		case "phone must start with international calling code prefix '+'":
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Phone must start with international calling code prefix '+'"})
+		case "invalid phone number format":
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid phone number format"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
