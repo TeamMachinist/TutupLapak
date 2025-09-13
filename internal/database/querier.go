@@ -11,6 +11,7 @@ import (
 )
 
 type Querier interface {
+	CheckExistedUserAuthByEmail(ctx context.Context, email *string) (bool, error)
 	CheckPhoneExists(ctx context.Context, phone *string) (bool, error)
 	CheckProductOwnership(ctx context.Context, arg CheckProductOwnershipParams) (bool, error)
 	CheckSKUExistsByUser(ctx context.Context, arg CheckSKUExistsByUserParams) (CheckSKUExistsByUserRow, error)
@@ -18,7 +19,7 @@ type Querier interface {
 	CreateProduct(ctx context.Context, arg CreateProductParams) (Products, error)
 	CreatePurchase(ctx context.Context, arg CreatePurchaseParams) error
 	CreateUser(ctx context.Context, arg CreateUserParams) (Users, error)
-	CreateUserAuth(ctx context.Context, arg CreateUserAuthParams) (CreateUserAuthRow, error)
+	CreateUserAuth(ctx context.Context, arg CreateUserAuthParams) (UsersAuth, error)
 	DeleteFile(ctx context.Context, id uuid.UUID) error
 	DeleteProduct(ctx context.Context, arg DeleteProductParams) error
 	DeleteUser(ctx context.Context, id uuid.UUID) error
@@ -26,6 +27,7 @@ type Querier interface {
 	GetFile(ctx context.Context, id uuid.UUID) (Files, error)
 	GetFileByIDAndUserID(ctx context.Context, arg GetFileByIDAndUserIDParams) (Files, error)
 	GetFilesByUser(ctx context.Context, userID uuid.UUID) ([]Files, error)
+	GetUserAuthByEmail(ctx context.Context, email *string) (UsersAuth, error)
 	GetProductByID(ctx context.Context, id uuid.UUID) (Products, error)
 	GetUserAuthByID(ctx context.Context, id uuid.UUID) (GetUserAuthByIDRow, error)
 	GetUserAuthByPhone(ctx context.Context, phone *string) (GetUserAuthByPhoneRow, error)
@@ -34,6 +36,7 @@ type Querier interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (Users, error)
 	GetUserByPhone(ctx context.Context, phone *string) (Users, error)
 	GetUserWithAuth(ctx context.Context, id uuid.UUID) (GetUserWithAuthRow, error)
+	RegisterWithEmail(ctx context.Context, arg RegisterWithEmailParams) (UsersAuth, error)
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (UpdateProductRow, error)
 	UpdateProductQty(ctx context.Context, arg UpdateProductQtyParams) (int64, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (Users, error)

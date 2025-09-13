@@ -10,24 +10,26 @@ import (
 // User Models
 type UserAuth struct {
 	ID           uuid.UUID `json:"id"`
+	Email        string    `json:"email"`
 	Phone        string    `json:"phone"`
 	PasswordHash string    `json:"-"`
 	CreatedAt    time.Time `json:"created_at"`
 }
 
-type LoginPhoneRequest struct {
+type EmailAuthRequest struct {
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=8,max=32"`
+}
+
+type PhoneAuthRequest struct {
 	Phone    string `json:"phone" binding:"required"`
 	Password string `json:"password" binding:"required,min=8,max=32"`
 }
 
-type LoginResponse struct {
+type AuthResponse struct {
+	Email string `json:"email"`
 	Phone string `json:"phone"`
 	Token string `json:"token"`
-}
-
-type RegisterPhoneRequest struct {
-	Phone    string `json:"phone" binding:"required"`
-	Password string `json:"password" binding:"required,min=8,max=32"`
 }
 
 // Password utility functions

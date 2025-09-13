@@ -9,8 +9,18 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const checkExistedUserAuthByEmail = `-- name: CheckExistedUserAuthByEmail :one
+SELECT EXISTS(SELECT 1 FROM users_auth WHERE email = $1) as exists
+`
+
+func (q *Queries) CheckExistedUserAuthByEmail(ctx context.Context, email *string) (bool, error) {
+	row := q.db.QueryRow(ctx, checkExistedUserAuthByEmail, email)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
 
 const checkPhoneExists = `-- name: CheckPhoneExists :one
 SELECT EXISTS(SELECT 1 FROM users_auth WHERE phone = $1) as exists
@@ -26,7 +36,7 @@ func (q *Queries) CheckPhoneExists(ctx context.Context, phone *string) (bool, er
 const createUserAuth = `-- name: CreateUserAuth :one
 INSERT INTO users_auth (phone, password_hash)
 VALUES ($1, $2)
-RETURNING id, phone, password_hash, created_at
+RETURNING id, email, phone, password_hash, created_at
 `
 
 type CreateUserAuthParams struct {
@@ -34,18 +44,31 @@ type CreateUserAuthParams struct {
 	PasswordHash string  `json:"password_hash"`
 }
 
-type CreateUserAuthRow struct {
-	ID           uuid.UUID        `json:"id"`
-	Phone        *string          `json:"phone"`
-	PasswordHash string           `json:"password_hash"`
-	CreatedAt    pgtype.Timestamp `json:"created_at"`
-}
-
-func (q *Queries) CreateUserAuth(ctx context.Context, arg CreateUserAuthParams) (CreateUserAuthRow, error) {
+func (q *Queries) CreateUserAuth(ctx context.Context, arg CreateUserAuthParams) (UsersAuth, error) {
 	row := q.db.QueryRow(ctx, createUserAuth, arg.Phone, arg.PasswordHash)
-	var i CreateUserAuthRow
+	var i UsersAuth
 	err := row.Scan(
 		&i.ID,
+		&i.Email,
+		&i.Phone,
+		&i.PasswordHash,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getUserAuthByEmail = `-- name: GetUserAuthByEmail :one
+SELECT id, email, phone, password_hash, created_at
+FROM users_auth
+WHERE email = $1
+`
+
+func (q *Queries) GetUserAuthByEmail(ctx context.Context, email *string) (UsersAuth, error) {
+	row := q.db.QueryRow(ctx, getUserAuthByEmail, email)
+	var i UsersAuth
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
 		&i.Phone,
 		&i.PasswordHash,
 		&i.CreatedAt,
@@ -54,23 +77,17 @@ func (q *Queries) CreateUserAuth(ctx context.Context, arg CreateUserAuthParams) 
 }
 
 const getUserAuthByID = `-- name: GetUserAuthByID :one
-SELECT id, phone, password_hash, created_at
+SELECT id, email, phone, password_hash, created_at
 FROM users_auth
 WHERE id = $1
 `
 
-type GetUserAuthByIDRow struct {
-	ID           uuid.UUID        `json:"id"`
-	Phone        *string          `json:"phone"`
-	PasswordHash string           `json:"password_hash"`
-	CreatedAt    pgtype.Timestamp `json:"created_at"`
-}
-
-func (q *Queries) GetUserAuthByID(ctx context.Context, id uuid.UUID) (GetUserAuthByIDRow, error) {
+func (q *Queries) GetUserAuthByID(ctx context.Context, id uuid.UUID) (UsersAuth, error) {
 	row := q.db.QueryRow(ctx, getUserAuthByID, id)
-	var i GetUserAuthByIDRow
+	var i UsersAuth
 	err := row.Scan(
 		&i.ID,
+		&i.Email,
 		&i.Phone,
 		&i.PasswordHash,
 		&i.CreatedAt,
@@ -79,23 +96,41 @@ func (q *Queries) GetUserAuthByID(ctx context.Context, id uuid.UUID) (GetUserAut
 }
 
 const getUserAuthByPhone = `-- name: GetUserAuthByPhone :one
-SELECT id, phone, password_hash, created_at
+SELECT id, email, phone, password_hash, created_at
 FROM users_auth
 WHERE phone = $1
 `
 
-type GetUserAuthByPhoneRow struct {
-	ID           uuid.UUID        `json:"id"`
-	Phone        *string          `json:"phone"`
-	PasswordHash string           `json:"password_hash"`
-	CreatedAt    pgtype.Timestamp `json:"created_at"`
-}
-
-func (q *Queries) GetUserAuthByPhone(ctx context.Context, phone *string) (GetUserAuthByPhoneRow, error) {
+func (q *Queries) GetUserAuthByPhone(ctx context.Context, phone *string) (UsersAuth, error) {
 	row := q.db.QueryRow(ctx, getUserAuthByPhone, phone)
-	var i GetUserAuthByPhoneRow
+	var i UsersAuth
 	err := row.Scan(
 		&i.ID,
+		&i.Email,
+		&i.Phone,
+		&i.PasswordHash,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const registerWithEmail = `-- name: RegisterWithEmail :one
+INSERT INTO users_auth (email, password_hash)
+VALUES ($1, $2)
+RETURNING id, email, phone, password_hash, created_at
+`
+
+type RegisterWithEmailParams struct {
+	Email        *string `json:"email"`
+	PasswordHash string  `json:"password_hash"`
+}
+
+func (q *Queries) RegisterWithEmail(ctx context.Context, arg RegisterWithEmailParams) (UsersAuth, error) {
+	row := q.db.QueryRow(ctx, registerWithEmail, arg.Email, arg.PasswordHash)
+	var i UsersAuth
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
 		&i.Phone,
 		&i.PasswordHash,
 		&i.CreatedAt,
