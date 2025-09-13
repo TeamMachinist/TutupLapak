@@ -13,7 +13,7 @@ import (
 type Querier interface {
 	CheckPhoneExists(ctx context.Context, phone *string) (bool, error)
 	CheckProductOwnership(ctx context.Context, arg CheckProductOwnershipParams) (bool, error)
-	CheckSKUExistsByUser(ctx context.Context, arg CheckSKUExistsByUserParams) (uuid.UUID, error)
+	CheckSKUExistsByUser(ctx context.Context, arg CheckSKUExistsByUserParams) (CheckSKUExistsByUserRow, error)
 	CreateFile(ctx context.Context, arg CreateFileParams) (Files, error)
 	CreateProduct(ctx context.Context, arg CreateProductParams) (Products, error)
 	CreatePurchase(ctx context.Context, arg CreatePurchaseParams) error

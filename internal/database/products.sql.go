@@ -15,7 +15,7 @@ import (
 const checkProductOwnership = `-- name: CheckProductOwnership :one
 SELECT EXISTS(
     SELECT 1 FROM products
-    WHERE product_id = $1::uuid AND user_id = $2::uuid
+    WHERE id = $1::uuid AND user_id = $2::uuid
 ) as exists
 `
 
@@ -32,7 +32,7 @@ func (q *Queries) CheckProductOwnership(ctx context.Context, arg CheckProductOwn
 }
 
 const checkSKUExistsByUser = `-- name: CheckSKUExistsByUser :one
-SELECT id
+SELECT id, sku
 FROM products
 WHERE sku = $1::text AND user_id = $2::uuid
 LIMIT 1
@@ -43,11 +43,16 @@ type CheckSKUExistsByUserParams struct {
 	UserID uuid.UUID `json:"user_id"`
 }
 
-func (q *Queries) CheckSKUExistsByUser(ctx context.Context, arg CheckSKUExistsByUserParams) (uuid.UUID, error) {
+type CheckSKUExistsByUserRow struct {
+	ID  uuid.UUID `json:"id"`
+	Sku string    `json:"sku"`
+}
+
+func (q *Queries) CheckSKUExistsByUser(ctx context.Context, arg CheckSKUExistsByUserParams) (CheckSKUExistsByUserRow, error) {
 	row := q.db.QueryRow(ctx, checkSKUExistsByUser, arg.Sku, arg.UserID)
-	var id uuid.UUID
-	err := row.Scan(&id)
-	return id, err
+	var i CheckSKUExistsByUserRow
+	err := row.Scan(&i.ID, &i.Sku)
+	return i, err
 }
 
 const createProduct = `-- name: CreateProduct :one
