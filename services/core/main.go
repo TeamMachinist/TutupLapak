@@ -45,21 +45,34 @@ func main() {
 		})
 	})
 
+	jwtConfig := &internal.JWTConfig{
+		Key:      cfg.JWT.Secret,
+		Duration: cfg.JWT.Duration,
+		Issuer:   cfg.JWT.Issuer,
+	}
+	jwtService := internal.NewJWTService(jwtConfig)
+
 	productRepo := repositories.NewProductRepository(database.Queries)
+	purchaseRepo := repositories.NewPurchaseRepository(database.Pool)
 
 	productService := services.NewProductService(productRepo)
+	purchaseService := services.NewPurchaseService(purchaseRepo)
 
 	productHandler := handlers.NewProductHandler(productService)
+	purchaseHandler := handlers.NewPurchaseHandler(purchaseService)
 
 	api := app.Group("/api/v1")
 
 	products := api.Group("/products")
 	{
 		products.Get("", productHandler.GetAllProducts)
-		products.Post("", productHandler.CreateProduct)
-		products.Put("/:productId", productHandler.UpdateProduct)
-		products.Delete("/:productId", productHandler.DeleteProduct)
-
+		products.Post("", jwtService.FiberMiddleware(), productHandler.CreateProduct)
+		products.Put("/:productId", jwtService.FiberMiddleware(), productHandler.UpdateProduct)
+		products.Delete("/:productId", jwtService.FiberMiddleware(), productHandler.DeleteProduct)
+	}
+	purchase := api.Group("/purchase")
+	{
+		purchase.Post("", purchaseHandler.CreatePurchase)
 	}
 
 	c := make(chan os.Signal, 1)

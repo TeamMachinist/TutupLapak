@@ -128,7 +128,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-  
+
   minio:
     image: minio/minio:latest
     container_name: tutuplapak-minio

@@ -14,7 +14,7 @@ import (
 
 type ProductRepositoryInterface interface {
 	CreateProduct(ctx context.Context, req models.ProductRequest) (models.ProductResponse, error)
-	CheckSKUExistsByUser(ctx context.Context, sku string, userID uuid.UUID) (uuid.UUID, error)
+	CheckSKUExistsByUser(ctx context.Context, sku string, userID uuid.UUID) (CheckSKUExistsByUserRow, error)
 	GetAllProducts(ctx context.Context, params models.GetAllProductsParams) ([]models.Product, error)
 	UpdateProduct(ctx context.Context, params database.UpdateProductParams) (database.UpdateProductRow, error)
 	CheckProductOwnership(ctx context.Context, productID uuid.UUID, userID uuid.UUID) (bool, error)
@@ -65,15 +65,23 @@ func (r *ProductRepository) CreateProduct(ctx context.Context, req models.Produc
 	return resp, nil
 }
 
-func (r *ProductRepository) CheckSKUExistsByUser(ctx context.Context, sku string, userID uuid.UUID) (uuid.UUID, error) {
-	productID, err := r.db.CheckSKUExistsByUser(ctx, database.CheckSKUExistsByUserParams{
+type CheckSKUExistsByUserRow struct {
+	ID  uuid.UUID `json:"id"`
+	Sku string    `json:"sku"`
+}
+
+func (r *ProductRepository) CheckSKUExistsByUser(ctx context.Context, sku string, userID uuid.UUID) (CheckSKUExistsByUserRow, error) {
+	row, err := r.db.CheckSKUExistsByUser(ctx, database.CheckSKUExistsByUserParams{
 		Sku:    sku,
 		UserID: userID,
 	})
 	if err != nil {
-		return uuid.Nil, err
+		return CheckSKUExistsByUserRow{}, err
 	}
-	return productID, nil
+	return CheckSKUExistsByUserRow{
+		ID:  row.ID,
+		Sku: row.Sku,
+	}, nil
 }
 
 func (r *ProductRepository) GetAllProducts(ctx context.Context, params models.GetAllProductsParams) ([]models.Product, error) {

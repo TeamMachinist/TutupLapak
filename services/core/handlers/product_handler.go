@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/teammachinist/tutuplapak/internal"
 	"github.com/teammachinist/tutuplapak/services/core/models"
 	"github.com/teammachinist/tutuplapak/services/core/services"
 
@@ -153,16 +154,23 @@ func (h *ProductHandler) CreateProduct(c *fiber.Ctx) error {
 		})
 	}
 
-	// userIDStr := c.Locals("userID").(string)
-	// userID, err := uuid.Parse(userIDStr)
-	// if err != nil {
-	// 	return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
-	// 		"error": "Invalid or missing token",
-	// 	})
-	// }
-	// req.UserID = userID
+	userIDStr, ok := internal.GetUserIDFromFiber(c)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "unauthorized: user not authenticated",
+		})
+	}
 
-	req.UserID = uuid.MustParse("11111111-1111-1111-1111-111111111111") // UUID dummy valid
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "invalid user id in token",
+		})
+	}
+
+	req.UserID = userID
+
+	// req.UserID = uuid.MustParse("11111111-1111-1111-1111-111111111111") // UUID dummy valid
 
 	productResp, err := h.productService.CreateProduct(c.Context(), req)
 	if err != nil {
@@ -220,13 +228,19 @@ func (h *ProductHandler) UpdateProduct(c *fiber.Ctx) error {
 		})
 	}
 
-	// // 2. Ambil userID dari JWT (diset di middleware)
-	// userID, ok := c.Locals("userID").(uuid.UUID)
-	// if !ok {
-	// 	return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-	// 		"error": "unauthorized: user not authenticated",
-	// 	})
-	// }
+	userIDStr, ok := internal.GetUserIDFromFiber(c)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "unauthorized: user not authenticated",
+		})
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "invalid user id in token",
+		})
+	}
 
 	var req models.ProductRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -234,7 +248,7 @@ func (h *ProductHandler) UpdateProduct(c *fiber.Ctx) error {
 			"error": "invalid request body",
 		})
 	}
-	userID := uuid.MustParse("11111111-1111-1111-1111-111111111111") // UUID dummy valid
+	// userID := uuid.MustParse("11111111-1111-1111-1111-111111111111") // UUID dummy valid
 
 	validate := validator.New()
 
@@ -311,13 +325,20 @@ func (h *ProductHandler) DeleteProduct(c *fiber.Ctx) error {
 		})
 	}
 
-	// userID, ok := c.Locals("userID").(uuid.UUID)
-	// if !ok {
-	// 	return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-	// 		"error": "unauthorized: invalid or missing token",
-	// 	})
-	// }
-	userID := uuid.MustParse("11111111-1111-1111-1111-111111111111") // UUID dummy valid
+	userIDStr, ok := internal.GetUserIDFromFiber(c)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "unauthorized: user not authenticated",
+		})
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "invalid user id in token",
+		})
+	}
+	// userID := uuid.MustParse("11111111-1111-1111-1111-111111111111") // UUID dummy valid
 
 	err = h.productService.DeleteProduct(ctx, productID, userID)
 	if err != nil {

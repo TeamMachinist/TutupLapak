@@ -26,7 +26,7 @@ INSERT INTO products (
 RETURNING *;
 
 -- name: CheckSKUExistsByUser :one
-SELECT id
+SELECT id, sku
 FROM products
 WHERE sku = @sku::text AND user_id = @user_id::uuid
 LIMIT 1;
@@ -73,9 +73,29 @@ RETURNING id, name, category, qty, price, sku, file_id, created_at, updated_at;
 -- name: CheckProductOwnership :one
 SELECT EXISTS(
     SELECT 1 FROM products
-    WHERE product_id = @product_id::uuid AND user_id = @user_id::uuid
+    WHERE id = @product_id::uuid AND user_id = @user_id::uuid
 ) as exists;
 
 -- name: DeleteProduct :exec
 DELETE FROM products
 WHERE id = @id::uuid AND user_id = @user_id::uuid;
+
+-- name: UpdateProductQty :execrows
+UPDATE products 
+SET qty = qty - $2 
+WHERE id = $1;
+
+-- name: GetProductByID :one
+SELECT 
+    id,
+    name,
+    category,
+    qty,
+    price,
+    sku,
+    file_id,
+    user_id,
+    created_at,
+    updated_at
+FROM products 
+WHERE id = $1;

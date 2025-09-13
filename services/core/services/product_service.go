@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/teammachinist/tutuplapak/internal/database"
@@ -118,24 +119,28 @@ func (s *ProductService) UpdateProduct(
 	userID uuid.UUID,
 ) (models.ProductResponse, error) {
 
-	// owned, err := s.productRepo.CheckProductOwnership(ctx, productID, userID)
-	// if err != nil {
-	// 	return models.ProductResponse{}, err
-	// }
-	// if !owned {
-	// 	return models.ProductResponse{}, errors.New("unauthorized: you don't own this product")
-	// }
-
-	// ??? is this neccesaryy?
-	existingProductID, err := s.productRepo.CheckSKUExistsByUser(ctx, req.SKU, userID)
-	if err == nil {
-		if existingProductID != productID {
-			return models.ProductResponse{}, errors.New("sku already exists")
-		}
-	} else if !errors.Is(err, sql.ErrNoRows) {
-		return models.ProductResponse{}, err
+	owned, err := s.productRepo.CheckProductOwnership(ctx, productID, userID)
+	if err != nil {
+		// fmt.Printf("Error checking ownership: %v\n", err)
+		return models.ProductResponse{}, fmt.Errorf("internal error verifying ownership")
 	}
 
+	if !owned {
+		fmt.Println("User does not own this product")
+		return models.ProductResponse{}, errors.New("unauthorized: you don't own this product")
+	}
+	fmt.Println("error disini")
+	existingProduct, err := s.productRepo.CheckSKUExistsByUser(ctx, req.SKU, userID)
+
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return models.ProductResponse{}, err
+		}
+	} else {
+		if existingProduct.ID != productID {
+			return models.ProductResponse{}, errors.New("sku already exists for this user")
+		}
+	}
 	// // 3. Validasi fileId jika tidak zero
 	// if req.FileID != uuid.Nil {
 	// 	_, err := s.fileClient.GetFileByID(ctx, req.FileID)

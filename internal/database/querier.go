@@ -13,9 +13,10 @@ import (
 type Querier interface {
 	CheckPhoneExists(ctx context.Context, phone *string) (bool, error)
 	CheckProductOwnership(ctx context.Context, arg CheckProductOwnershipParams) (bool, error)
-	CheckSKUExistsByUser(ctx context.Context, arg CheckSKUExistsByUserParams) (uuid.UUID, error)
+	CheckSKUExistsByUser(ctx context.Context, arg CheckSKUExistsByUserParams) (CheckSKUExistsByUserRow, error)
 	CreateFile(ctx context.Context, arg CreateFileParams) (Files, error)
 	CreateProduct(ctx context.Context, arg CreateProductParams) (Products, error)
+	CreatePurchase(ctx context.Context, arg CreatePurchaseParams) error
 	CreateUser(ctx context.Context, arg CreateUserParams) (Users, error)
 	CreateUserAuth(ctx context.Context, arg CreateUserAuthParams) (CreateUserAuthRow, error)
 	DeleteFile(ctx context.Context, id uuid.UUID) error
@@ -25,6 +26,7 @@ type Querier interface {
 	GetFile(ctx context.Context, id uuid.UUID) (Files, error)
 	GetFileByIDAndUserID(ctx context.Context, arg GetFileByIDAndUserIDParams) (Files, error)
 	GetFilesByUser(ctx context.Context, userID uuid.UUID) ([]Files, error)
+	GetProductByID(ctx context.Context, id uuid.UUID) (Products, error)
 	GetUserAuthByID(ctx context.Context, id uuid.UUID) (GetUserAuthByIDRow, error)
 	GetUserAuthByPhone(ctx context.Context, phone *string) (GetUserAuthByPhoneRow, error)
 	GetUserByAuthID(ctx context.Context, userAuthID uuid.UUID) (Users, error)
@@ -33,6 +35,7 @@ type Querier interface {
 	GetUserByPhone(ctx context.Context, phone *string) (Users, error)
 	GetUserWithAuth(ctx context.Context, id uuid.UUID) (GetUserWithAuthRow, error)
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (UpdateProductRow, error)
+	UpdateProductQty(ctx context.Context, arg UpdateProductQtyParams) (int64, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (Users, error)
 	UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams) (Users, error)
 	UpdateUserPhone(ctx context.Context, arg UpdateUserPhoneParams) (Users, error)
