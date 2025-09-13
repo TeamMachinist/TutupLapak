@@ -16,7 +16,7 @@ func NewUserHandler(userService *UserService) *UserHandler {
 }
 
 func (h *UserHandler) LoginByPhone(c *gin.Context) {
-	var req LoginPhoneRequest
+	var req PhoneAuthRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
@@ -48,7 +48,7 @@ func (h *UserHandler) LoginByPhone(c *gin.Context) {
 
 func (h *UserHandler) RegisterByPhone(c *gin.Context) {
 	fmt.Println("Handler: RegisterByPhone")
-	var req RegisterPhoneRequest
+	var req PhoneAuthRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return

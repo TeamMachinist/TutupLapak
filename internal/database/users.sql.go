@@ -182,7 +182,7 @@ type GetUserWithAuthRow struct {
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 	PasswordHash      string             `json:"password_hash"`
-	AuthCreatedAt     pgtype.Timestamp   `json:"auth_created_at"`
+	AuthCreatedAt     pgtype.Timestamptz `json:"auth_created_at"`
 }
 
 func (q *Queries) GetUserWithAuth(ctx context.Context, id uuid.UUID) (GetUserWithAuthRow, error) {

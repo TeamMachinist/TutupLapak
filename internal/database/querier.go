@@ -18,7 +18,7 @@ type Querier interface {
 	CreateFile(ctx context.Context, arg CreateFileParams) (Files, error)
 	CreateProduct(ctx context.Context, arg CreateProductParams) (Products, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (Users, error)
-	CreateUserAuth(ctx context.Context, arg CreateUserAuthParams) (CreateUserAuthRow, error)
+	CreateUserAuth(ctx context.Context, arg CreateUserAuthParams) (UsersAuth, error)
 	DeleteFile(ctx context.Context, id uuid.UUID) error
 	DeleteProduct(ctx context.Context, arg DeleteProductParams) error
 	DeleteUser(ctx context.Context, id uuid.UUID) error
@@ -26,15 +26,15 @@ type Querier interface {
 	GetFile(ctx context.Context, id uuid.UUID) (Files, error)
 	GetFileByIDAndUserID(ctx context.Context, arg GetFileByIDAndUserIDParams) (Files, error)
 	GetFilesByUser(ctx context.Context, userID uuid.UUID) ([]Files, error)
-	GetUserAuthByEmail(ctx context.Context, email *string) (GetUserAuthByEmailRow, error)
+	GetUserAuthByEmail(ctx context.Context, email *string) (UsersAuth, error)
 	GetUserAuthByID(ctx context.Context, id uuid.UUID) (UsersAuth, error)
-	GetUserAuthByPhone(ctx context.Context, phone *string) (GetUserAuthByPhoneRow, error)
+	GetUserAuthByPhone(ctx context.Context, phone *string) (UsersAuth, error)
 	GetUserByAuthID(ctx context.Context, userAuthID uuid.UUID) (Users, error)
 	GetUserByEmail(ctx context.Context, email *string) (Users, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (Users, error)
 	GetUserByPhone(ctx context.Context, phone *string) (Users, error)
 	GetUserWithAuth(ctx context.Context, id uuid.UUID) (GetUserWithAuthRow, error)
-	RegisterWithEmail(ctx context.Context, arg RegisterWithEmailParams) (RegisterWithEmailRow, error)
+	RegisterWithEmail(ctx context.Context, arg RegisterWithEmailParams) (UsersAuth, error)
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (UpdateProductRow, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (Users, error)
 	UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams) (Users, error)

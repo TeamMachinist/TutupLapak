@@ -33,7 +33,7 @@ func NewUserService(userRepo *UserRepository, jwtService internal.JWTService, db
 	}
 }
 
-func (s *UserService) LoginByPhone(ctx context.Context, phone, password string) (*LoginPhoneResponse, error) {
+func (s *UserService) LoginByPhone(ctx context.Context, phone, password string) (*AuthResponse, error) {
 	// Validate phone format
 	if err := s.validatePhone(phone); err != nil {
 		return nil, err
@@ -70,13 +70,14 @@ func (s *UserService) LoginByPhone(ctx context.Context, phone, password string) 
 		return nil, errors.New("failed to generate token")
 	}
 
-	return &LoginPhoneResponse{
+	return &AuthResponse{
+		Email: userAuth.Email,
 		Phone: userAuth.Phone,
 		Token: token,
 	}, nil
 }
 
-func (s *UserService) RegisterByPhone(ctx context.Context, phone, password string) (*LoginPhoneResponse, error) {
+func (s *UserService) RegisterByPhone(ctx context.Context, phone, password string) (*AuthResponse, error) {
 	// Validate inputs
 	if err := s.validatePhone(phone); err != nil {
 		return nil, err
@@ -125,13 +126,14 @@ func (s *UserService) RegisterByPhone(ctx context.Context, phone, password strin
 		return nil, errors.New("failed to generate token")
 	}
 
-	return &LoginPhoneResponse{
+	return &AuthResponse{
+		Email: userAuth.Email,
 		Phone: userAuth.Phone,
 		Token: token,
 	}, nil
 }
 
-func (s *UserService) LoginWithEmail(ctx context.Context, email, password string) (*LoginEmailResponse, error) {
+func (s *UserService) LoginWithEmail(ctx context.Context, email, password string) (*AuthResponse, error) {
 	// Validate email format
 	if err := s.validateEmail(email); err != nil {
 		return nil, err
@@ -168,13 +170,14 @@ func (s *UserService) LoginWithEmail(ctx context.Context, email, password string
 		return nil, errors.New("failed to generate token")
 	}
 
-	return &LoginEmailResponse{
+	return &AuthResponse{
 		Email: userAuth.Email,
+		Phone: userAuth.Phone,
 		Token: token,
 	}, nil
 }
 
-func (s *UserService) RegisterWithEmail(ctx context.Context, email, password string) (*LoginEmailResponse, error) {
+func (s *UserService) RegisterWithEmail(ctx context.Context, email, password string) (*AuthResponse, error) {
 	// Validate email format
 	if err := s.validateEmail(email); err != nil {
 		return nil, err
@@ -225,8 +228,9 @@ func (s *UserService) RegisterWithEmail(ctx context.Context, email, password str
 		return nil, errors.New("failed to generate token")
 	}
 
-	return &LoginEmailResponse{
+	return &AuthResponse{
 		Email: userAuth.Email,
+		Phone: userAuth.Phone,
 		Token: token,
 	}, nil
 }
