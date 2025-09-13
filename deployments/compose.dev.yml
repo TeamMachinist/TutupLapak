@@ -2,91 +2,158 @@ services:
   # API Gateway
   nginx:
     image: nginx:alpine
+    container_name: tutuplapak-nginx
+    env_file: .env
     ports:
       - "80:80"
     volumes:
       - ../configs/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
-      - auth-service
-      - core-service
-      - files-service
+      auth-service:
+        condition: service_healthy
+      core-service:
+        condition: service_healthy
+      files-service:
+        condition: service_healthy
     restart: unless-stopped
+    networks:
+      - tutuplapak-network
 
   # Auth Service
   auth-service:
+    container_name: tutuplapak-auth-service
+    env_file: .env
     build:
-      context: ../services/auth
-      dockerfile: Dockerfile.dev
+      context: ..
+      dockerfile: services/auth/Dockerfile.dev
     volumes:
-      - ../services/auth:/app:cached
-      - /app/tmp
+      - ../services/auth:/app/services/auth:cached
     ports:
       - "${AUTH_PORT}:${AUTH_PORT}"
     environment:
+      - ENV=development
       - PORT=${AUTH_PORT}
       - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_DURATION=${JWT_DURATION}
+      - JWT_ISSUER=${JWT_ISSUER}
     depends_on:
-      - main-db
+      main-db:
+        condition: service_healthy
     restart: unless-stopped
+    networks:
+      - tutuplapak-network
 
   # Core Service
   core-service:
+    container_name: tutuplapak-core-service
+    env_file: .env
     build:
-      context: ../services/core
-      dockerfile: Dockerfile.dev
+      context: ..
+      dockerfile: services/core/Dockerfile.dev
     volumes:
-      - ../services/core:/app:cached
-      - /app/tmp
+      - ../services/core:/app/services/core:cached
     ports:
       - "${CORE_PORT}:${CORE_PORT}"
     environment:
+      - ENV=development
       - PORT=${CORE_PORT}
+      - API_TIMEOUT=${API_TIMEOUT}
       - DATABASE_URL=${DATABASE_URL}
       - AUTH_SERVICE_URL=${AUTH_SERVICE_URL}
       - FILES_SERVICE_URL=${FILES_SERVICE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_DURATION=${JWT_DURATION}
+      - JWT_ISSUER=${JWT_ISSUER}
     depends_on:
-      - main-db
+      main-db:
+        condition: service_healthy
     restart: unless-stopped
+    networks:
+      - tutuplapak-network
 
   # Files Service
   files-service:
+    container_name: tutuplapak-files-service
+    env_file: .env
     build:
-      context: ../services/files
-      dockerfile: Dockerfile.dev
+      context: ..
+      dockerfile: services/files/Dockerfile.dev
     volumes:
-      - ../services/files:/app:cached
-      - /app/tmp
+      - ../services/files:/app/services/files:cached
     ports:
       - "${FILES_PORT}:${FILES_PORT}"
     environment:
+      - ENV=development
       - PORT=${FILES_PORT}
       - DATABASE_URL=${DATABASE_URL}
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT}
+      - MINIO_PUBLIC_ENDPOINT=${MINIO_PUBLIC_ENDPOINT}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - MINIO_BUCKET=${MINIO_BUCKET}
+      - MINIO_USE_SSL=${MINIO_USE_SSL}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_DURATION=${JWT_DURATION}
+      - JWT_ISSUER=${JWT_ISSUER}
     depends_on:
-      - main-db
+      main-db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
     restart: unless-stopped
+    networks:
+      - tutuplapak-network
 
   # Main Database
   main-db:
     image: postgres:15-alpine
+    container_name: tutuplapak-main-db
+    env_file: .env
     environment:
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - main_data:/var/lib/postgresql/data
       - ../migrations:/docker-entrypoint-initdb.d/:ro
+      - ../seeds:/seeds:ro
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT}:5432"
     restart: unless-stopped
+    networks:
+      - tutuplapak-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
+  
+  minio:
+    image: minio/minio:latest
+    container_name: tutuplapak-minio
+    env_file: .env
+    ports:
+      - "${MINIO_PORT}:9000"
+      - "${MINIO_CONSOLE_PORT}:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - tutuplapak-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
 
 volumes:
   main_data:
+  minio_data:
 
 networks:
-  default:
-    name: tutuplapak-network
+  tutuplapak-network:
+    driver: bridge

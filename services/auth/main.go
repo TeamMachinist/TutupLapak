@@ -1,26 +1,27 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
 	"time"
 
-	"github.com/caarlos0/env"
+	"github.com/teammachinist/tutuplapak/internal"
+
+	"github.com/caarlos0/env/v8"
 	"github.com/gin-gonic/gin"
 	_ "github.com/joho/godotenv/autoload"
-	"github.com/redis/go-redis/v9"
-
 )
 
 type Config struct {
-	HTTPPort    string `env:"HTTP_PORT" envDefault:"8001"`
-	DatabaseURL string `env:"DATABASE_URL"`
+	HTTPPort    string `env:"PORT" envDefault:"8001"`
+	DatabaseURL string `env:"DATABASE_URL" envDefault:""`
 
 	// JWT Configuration
 	JWTSecret   string        `env:"JWT_SECRET" envDefault:"your-secret-key"`
 	JWTDuration time.Duration `env:"JWT_DURATION" envDefault:"24h"`
-	JWTIssuer   string        `env:"JWT_ISSUER" envDefault:"tutuplapak-app"`
+	JWTIssuer   string        `env:"JWT_ISSUER" envDefault:"fitbyte-app"`
 
 	// Redis Configuration
 	RedisAddr     string `env:"REDIS_ADDR" envDefault:"redis:6379"`
@@ -35,95 +36,71 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	// TODO: Connect to database
-	db, err := database.Connect(cfg.DatabaseURL)
+	redisURL := os.Getenv("REDIS_URL")
+	if redisURL == "" {
+		redisURL = "redis://localhost:6379"
+	}
+
+	// Initialize database
+	ctx := context.Background()
+	db, err := internal.NewDatabase(ctx, cfg.DatabaseURL)
 	if err != nil {
-		log.Fatal("Failed to connect to database:", err)
+		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
 
-	// TODO: Initialize Redis cache
-	redisClient := redis.NewClient(&redis.Options{
-		Addr:     cfg.RedisAddr,
-		Password: cfg.RedisPassword,
-		DB:       cfg.RedisDB,
+	// Initialize JWT service
+	jwtConfig := &internal.JWTConfig{
+		Key:      cfg.JWTSecret,
+		Duration: cfg.JWTDuration,
+		Issuer:   cfg.JWTIssuer,
+	}
+	jwtService := internal.NewJWTService(jwtConfig)
+
+	// Initialize cache
+	cache := NewCacheService(redisURL)
+	defer cache.Close()
+
+	// Initialize layers
+	userRepo := NewUserRepository(db.Queries)
+	userService := NewUserService(userRepo, *jwtService, db.Queries)
+	userHandler := NewUserHandler(userService)
+	healthHandler := NewHealthHandler(db.Pool, cache)
+
+	router := gin.Default()
+
+	// Health check endpoints
+	router.GET("/healthz", healthHandler.HealthCheck)
+	router.GET("/ready", healthHandler.ReadinessCheck)
+	router.GET("/live", healthHandler.LivenessCheck)
+
+	// Authentication endpoints
+	v1 := router.Group("/api/v1")
+	v1.POST("/login/phone", userHandler.LoginByPhone)
+	v1.POST("/register/phone", userHandler.RegisterByPhone)
+	v1.POST("/login/email", userHandler.LoginWithEmail)
+	v1.POST("/register/email", userHandler.RegisterWithEmail)
+
+	// Simple token generation endpoint for testing
+	v1.POST("/token", func(c *gin.Context) {
+		var req struct {
+			UserID string `json:"user_id" binding:"required"`
+		}
+
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+			return
+		}
+
+		token, err := jwtService.GenerateToken(req.UserID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"token": token})
 	})
 
-	defer func() {
-		if err := redisClient.Close(); err != nil {
-			log.Printf("Error closing Redis connection: %v", err)
-		}
-	}()
-
-	cache, err := cache.NewRedis(cache.RedisConfig{DB: redisClient})
-	if err != nil {
-		log.Fatal("Failed to initialize Redis cache:", err)
-	}
-
-	// Initialize JWT service
-	jwtConfig := &service.SecurityConfig{
-		Key:    cfg.JWTSecret,
-		Durasi: cfg.JWTDuration,
-		Issues: cfg.JWTIssuer,
-	}
-	jwtService := service.NewJwtService(jwtConfig)
-
-	// Initialize health handler
-	healthHandler := handler.NewHealthHandler(db, cache)
-
-	// Initialize users layers
-	authRepo := repository.NewAuthRepository(db)
-	authService := service.NewAuthService(authRepo, cache, jwtService)
-	authHandler := handler.NewUserHandler(authService)
-
-	// Initialize middleware
-	authMiddleware := middleware.NewAuthMiddleware(jwtService)
-
-	// Setup Gin router
-	r := gin.Default()
-
-	// Routes
-	http.HandleFunc("/healthz", healthHandler)
-	v1 := r.Group("/api/v1")
-	{
-		v1.POST("/register", authHandler.RegisterWithEmail)
-		v1.POST("/login", authHandler.LoginWithEmail)
-	}
-
-	// Create HTTP server
-	srv := &http.Server{
-		Addr:    ":" + cfg.HTTPPort,
-		Handler: r,
-	}
-
-	// Start server in a goroutine
-	go func() {
-		log.Printf("Auth service starting on port %s", cfg.HTTPPort)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Failed to start server: %v", err)
-		}
-	}()
-
-	// Wait for interrupt signal for graceful shutdown
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-	log.Println("Shutting down server...")
-
-	// Give 30 seconds for graceful shutdown
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	// Shutdown server
-	if err := srv.Shutdown(ctx); err != nil {
-		log.Printf("Server forced to shutdown: %v", err)
-	}
-
-	log.Println("Server exited")
-}
-
-func healthHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status":"healthy","service":"auth"}`))
+	log.Printf("Auth service starting on port %s", cfg.HTTPPort)
+	log.Fatal(router.Run(":" + cfg.HTTPPort))
 }

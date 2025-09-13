@@ -4,196 +4,278 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
-	"time"
+	"regexp"
+	"strings"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/teammachinist/tutuplapak/internal"
+	"github.com/teammachinist/tutuplapak/internal/database"
+
+	"github.com/jackc/pgconn"
 )
 
-type AuthService struct {
-	authRepo   *repository.AuthRepository
-	cache      *cache.Redis
-	hasher     utils.PasswordHasher
-	jwtService JwtService
+var (
+	ErrInvalidToken = errors.New("invalid token")
+	ErrExpiredToken = errors.New("token has expired")
+)
+
+type UserService struct {
+	userRepo   *UserRepository
+	jwtService internal.JWTService
+	db         *database.Queries
 }
 
-func NewAuthService(authRepo *repository.AuthRepository, cache *cache.Redis, jwt JwtService) *AuthService {
-	return &AuthService{
-		authRepo:   authRepo,
-		cache:      cache,
-		hasher:  	utils.NewPasswordHasher(), // Consider making this a singleton if expensive to create
-		jwtService: jwt,
+func NewUserService(userRepo *UserRepository, jwtService internal.JWTService, db *database.Queries) *UserService {
+	return &UserService{
+		userRepo:   userRepo,
+		jwtService: jwtService,
+		db:         db,
 	}
 }
 
-// RegisterNewUser optimized for performance with value passing
-// Uses stack allocation for better cache locality and reduced GC pressure
-func (s *AuthService) RegisterWithEmail(ctx context.Context, payload model.EmailAuthRequest) (model.AuthResponse, error) {
-	// Early context check to avoid unnecessary work
-	select {
-	case <-ctx.Done():
-		return model.AuthResponse{}, ctx.Err()
-	default:
+func (s *UserService) LoginByPhone(ctx context.Context, phone, password string) (*LoginPhoneResponse, error) {
+	// Validate phone format
+	if err := s.validatePhone(phone); err != nil {
+		return nil, err
 	}
 
-	// Check if email exists using cache first, then database
-	exists, err := s.checkExistedUserByEmailWithCache(ctx, payload.Email)
+	// Validate password
+	if err := s.validatePassword(password); err != nil {
+		return nil, err
+	}
+
+	// Validate user auth by phone
+	userAuth, err := s.userRepo.GetUserByPhone(ctx, phone)
 	if err != nil {
-		return model.AuthResponse{}, fmt.Errorf("failed to check user existence: %w", err)
+		return nil, errors.New("phone not found")
+	}
+
+	// Check password
+	if !CheckPassword(password, userAuth.PasswordHash) {
+		return nil, errors.New("invalid credentials")
+	}
+
+	fmt.Println("----------------")
+	fmt.Printf("userAuth: %+v\n", userAuth)
+
+	// Get user, hit db directly for development purpose
+	user, err := s.db.GetUserByAuthID(ctx, userAuth.ID)
+
+	fmt.Printf("user: %+v\n", user)
+	fmt.Println("----------------")
+
+	// Generate JWT token
+	token, err := s.jwtService.GenerateToken(user.ID.String())
+	if err != nil {
+		return nil, errors.New("failed to generate token")
+	}
+
+	return &LoginPhoneResponse{
+		Phone: userAuth.Phone,
+		Token: token,
+	}, nil
+}
+
+func (s *UserService) RegisterByPhone(ctx context.Context, phone, password string) (*LoginPhoneResponse, error) {
+	// Validate inputs
+	if err := s.validatePhone(phone); err != nil {
+		return nil, err
+	}
+	if err := s.validatePassword(password); err != nil {
+		return nil, err
+	}
+
+	// Check if phone already exists
+	exists, err := s.userRepo.CheckPhoneExists(ctx, phone)
+	if err != nil {
+		return nil, err
 	}
 	if exists {
-		return model.AuthResponse{}, error.ErrConflict
+		return nil, errors.New("phone number already exists")
 	}
 
-	// Hash password - this is CPU intensive, do it early
-	hashedPassword, err := s.hasher.EncryptPassword(payload.Password)
+	// Hash password
+	passwordHash, err := HashPassword(password)
 	if err != nil {
-		return model.AuthResponse{}, fmt.Errorf("failed to encrypt password: %w", err)
+		return nil, errors.New("failed to hash password")
 	}
 
-	payload.password := hashedPassword
-
-	// Another context check before expensive DB operation
-	select {
-	case <-ctx.Done():
-		return model.AuthResponse{}, ctx.Err()
-	default:
-	}
-
-	// Create user in database
-	user := UsersAuth{}
-	
-	var pgUUID pgtype.UUID
-	copy(pgUUID.Bytes[:], gUUID[:])
-	pgUUID.Status = pgtype.Present
-	
-	user.ID = pgUUID
-	user.Phone = ""
-	user.HashedPassword = payload.hashed_password
-	user.CreatedAt = time.Now()
-	user.UpdatedAt = time.Now()
-	
-	createdUser, err := s.authRepo.RegisterNewUser(ctx, user)
+	// Create user auth
+	userAuth, err := s.userRepo.CreateUserByPhone(ctx, phone, passwordHash)
 	if err != nil {
-		// Check if context was cancelled during DB operation
-		if ctx.Err() != nil {
-			return model.AuthResponse{}, ctx.Err()
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			if pgErr.Code == "23505" {
+				return nil, errors.New("phone number already exists")
+			}
 		}
-		return model.AuthResponse{}, fmt.Errorf("failed to create user: %w", err)
+		return nil, err
 	}
 
-	// Generate JWT token
-	token, err := s.jwtService.GenerateToken(&createdUser)
+	// Create user, hit db directly for development purpose
+	user, err := s.db.CreateUser(ctx, database.CreateUserParams{
+		ID:         uuid.New(),
+		UserAuthID: userAuth.ID,
+		Email:      &userAuth.Phone,
+	})
+
+	// Generate token
+	token, err := s.jwtService.GenerateToken(user.ID.String())
 	if err != nil {
-		return model.AuthResponse{}, fmt.Errorf("failed to generate token: %w", err)
+		return nil, errors.New("failed to generate token")
 	}
 
-	// Cache user for future lookups (async to not block response)
-	go s.cacheUserAsync(createdUser)
-
-	// Return response - using value from created user to ensure consistency
-	return model.AuthResponse{
-		Email: createdUser.Email,
-		Phone: "",
+	return &LoginPhoneResponse{
+		Phone: userAuth.Phone,
 		Token: token,
 	}, nil
 }
 
-// Login optimized for high-frequency authentication requests
-// Uses aggressive caching and optimized value passing
-func (s *AuthService) LoginWithEmail(ctx context.Context, payload model.User) (model.AuthResponse, error) {
-	// Early validation - fail fast for invalid input
-	if payload.Email == "" {
-		return model.AuthResponse{}, errors.ErrBadRequest
-	}
-	if payload.Password == "" {
-		return model.AuthResponse{}, errors.ErrBadRequest
+func (s *UserService) LoginWithEmail(ctx context.Context, email, password string) (*LoginEmailResponse, error) {
+	// Validate email format
+	if err := s.validateEmail(email); err != nil {
+		return nil, err
 	}
 
-	// // Check rate limiting using cache (prevents brute force)
-	// if s.isRateLimited(ctx, payload.Email) {
-	// 	return model.AuthResponse{}, ErrTooManyAttempts
-	// }
+	// Validate password
+	if err := s.validatePassword(password); err != nil {
+		return nil, err
+	}
 
-	// Try to get user from cache first (hot path optimization)
-	user, err := s.getUserByEmailWithCache(ctx, payload.Email)
+	// Validate user auth by email
+	userAuth, err := s.userRepo.GetUserAuthByEmail(ctx, email)
 	if err != nil {
-		return model.AuthResponse{}, errors.ErrNotFound
+		return nil, errors.New("email not found")
 	}
 
-	// Compare password hash - this is CPU intensive
-	if err := s.hasher.ComparePasswordHash(user.Password, payload.Password); err != nil {
-		return model.AuthResponse{}, errors.ErrUnauthorized
+	// Check password
+	if !CheckPassword(password, userAuth.PasswordHash) {
+		return nil, errors.New("invalid credentials")
 	}
+
+	fmt.Println("----------------")
+	fmt.Printf("userAuth: %+v\n", userAuth)
+
+	// Get user, hit db directly for development purpose
+	user, err := s.db.GetUserByAuthID(ctx, userAuth.ID)
+
+	fmt.Printf("user: %+v\n", user)
+	fmt.Println("----------------")
 
 	// Generate JWT token
-	token, err := s.jwtService.GenerateToken(&user)
+	token, err := s.jwtService.GenerateToken(user.ID.String())
 	if err != nil {
-		return model.AuthResponse{}, fmt.Errorf("failed to generate token: %w", err)
+		return nil, errors.New("failed to generate token")
 	}
 
-	// Return using payload email to avoid any potential inconsistencies
-	return model.AuthResponse{
-		Email: payload.Email,
-		Phone: "",
+	return &LoginEmailResponse{
+		Email: userAuth.Email,
 		Token: token,
 	}, nil
 }
 
-// checkUserExists checks cache first, then database
-func (s *AuthService) CheckExistedUserByEmailWithCache(ctx context.Context, email string) (bool, error) {
-	// Check cache first for recent lookups
-	cacheKey := fmt.Sprintf("user_exists:%s", email)
-	if exists, err := s.cache.Exists(ctx, cacheKey); err == nil && exists {
-		return true, nil
+func (s *UserService) RegisterWithEmail(ctx context.Context, email, password string) (*LoginEmailResponse, error) {
+	// Validate email format
+	if err := s.validateEmail(email); err != nil {
+		return nil, err
 	}
 
-	// Check database if not in cache
-	exists, err := s.authRepo.CheckExistedUserByEmail(ctx, email)
+	// Validate password
+	if err := s.validatePassword(password); err != nil {
+		return nil, err
+	}
+
+	// Check if email already exists
+	exists, err := s.userRepo.CheckExistedUserAuthByEmail(ctx, email)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
-
-	// Cache the result for 5 minutes to reduce DB hits
 	if exists {
-		s.cache.Set(ctx, cacheKey, "1", 5*time.Minute)
+		return nil, errors.New("email address already exists")
 	}
 
-	return exists, nil
-}
-
-// getUserWithCache attempts cache first, fallback to database
-func (s *AuthService) getUserByEmailWithCache(ctx context.Context, email string) (model.User, error) {
-	// Try cache first
-	cacheKey := fmt.Sprintf("user:%s", email)
-	var user model.User
-
-	if err := s.cache.Get(ctx, cacheKey, &user); err == nil {
-		return user, nil
-	}
-
-	// Cache miss - get from database
-	user, err := s.authRepo.GetUserByEmail(ctx, email)
+	// Hash password
+	passwordHash, err := HashPassword(password)
 	if err != nil {
-		return model.User{}, err
+		return nil, errors.New("failed to hash password")
 	}
 
-	// Cache for future requests (15 minutes)
-	go func() {
-		s.cache.Set(context.Background(), cacheKey, user, 15*time.Minute)
-	}()
+	// Create user auth
+	userAuth, err := s.userRepo.RegisterWithEmail(ctx, email, passwordHash)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			if pgErr.Code == "23505" {
+				return nil, errors.New("email address already exists")
+			}
+		}
+		return nil, err
+	}
 
-	return user, nil
+	// Create user, hit db directly for development purpose
+	user, err := s.db.CreateUser(ctx, database.CreateUserParams{
+		ID:         uuid.New(),
+		UserAuthID: userAuth.ID,
+		Email:      &userAuth.Email,
+	})
+
+	// Generate token
+	token, err := s.jwtService.GenerateToken(user.ID.String())
+	if err != nil {
+		return nil, errors.New("failed to generate token")
+	}
+
+	return &LoginEmailResponse{
+		Email: userAuth.Email,
+		Token: token,
+	}, nil
 }
 
-// cacheUserAsync caches user data asynchronously to not block response
-func (s *AuthService) cacheUserAsync(user model.User) {
-	ctx := context.Background()
-	cacheKey := fmt.Sprintf("user:%s", user.Email)
-	s.cache.Set(ctx, cacheKey, user, 15*time.Minute)
+func (s *UserService) validatePhone(phone string) error {
+	if phone == "" {
+		return errors.New("phone is required")
+	}
 
-	// Also cache existence for faster duplicate checks
-	existsKey := fmt.Sprintf("user_exists:%s", user.Email)
-	s.cache.Set(ctx, existsKey, "1", 5*time.Minute)
+	// Check if phone starts with "+"
+	if !strings.HasPrefix(phone, "+") {
+		return errors.New("phone must start with international calling code prefix '+'")
+	}
+
+	// Validate phone format (international format)
+	phoneRegex := regexp.MustCompile(`^\+[1-9]\d{1,14}$`)
+	if !phoneRegex.MatchString(phone) {
+		return errors.New("invalid phone number format")
+	}
+
+	return nil
+}
+
+func (s *UserService) validateEmail(email string) error {
+	if email == "" {
+		return errors.New("email is required")
+	}
+
+	// Validate email format (international format)
+	emailRegex := regexp.MustCompile(`^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,4}$`)
+	if !emailRegex.MatchString(email) {
+		return errors.New("invalid email address format")
+	}
+
+	return nil
+}
+
+func (s *UserService) validatePassword(password string) error {
+	if password == "" {
+		return errors.New("password is required")
+	}
+
+	if len(password) < 8 {
+		return errors.New("password must be at least 8 characters long")
+	}
+
+	if len(password) > 32 {
+		return errors.New("password must be at most 32 characters long")
+	}
+
+	return nil
 }

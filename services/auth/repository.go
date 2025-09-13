@@ -2,52 +2,97 @@ package main
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"strings"
-	"time"
 
-	"github.com/google/uuid"
+	"github.com/teammachinist/tutuplapak/internal/database"
 )
 
-type AuthRepository struct {
-	db *db.Queries
+type UserRepository struct {
+	db *database.Queries
 }
 
-func NewAuthRepository(db *db.Queries) *AuthRepository {
-	return &AuthRepository{q: q}
+func NewUserRepository(db *database.Queries) *UserRepository {
+	return &UserRepository{db: db}
 }
 
-func (r *AuthRepository) CheckExistedUserByEmail(ctx context.Context, email strings) (bool, error) {
-	exist, err := r.db.CheckExistedUserByEmail(ctx, email)
-
+func (r *UserRepository) CheckPhoneExists(ctx context.Context, phone string) (bool, error) {
+	result, err := r.db.CheckPhoneExists(ctx, &phone)
 	if err != nil {
 		return false, err
 	}
-
-	if exist == nil {
-		return false, nil
-	}
-
-	return true, nil
+	return result, nil
 }
 
-func (r *AuthRepository) GetUserByEmail(ctx context.Context, email strings) (UsersAuth, error) {
-	result, err := r.db.GetUserByEmail(ctx, email)
-
+func (r *UserRepository) GetUserByPhone(ctx context.Context, phone string) (*UserAuth, error) {
+	user, err := r.db.GetUserAuthByPhone(ctx, &phone)
 	if err != nil {
 		return nil, err
 	}
 
+	return &UserAuth{
+		ID:           user.ID,
+		Phone:        *user.Phone,
+		PasswordHash: user.PasswordHash,
+		CreatedAt:    user.CreatedAt.Time,
+	}, nil
+}
+
+func (r *UserRepository) CreateUserByPhone(ctx context.Context, phone, passwordHash string) (*UserAuth, error) {
+	params := database.CreateUserAuthParams{
+		Phone:        &phone,
+		PasswordHash: passwordHash,
+	}
+
+	user, err := r.db.CreateUserAuth(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	return &UserAuth{
+		ID:           user.ID,
+		Phone:        *user.Phone,
+		PasswordHash: user.PasswordHash,
+		CreatedAt:    user.CreatedAt.Time,
+	}, nil
+}
+
+func (r *UserRepository) CheckExistedUserAuthByEmail(ctx context.Context, email string) (bool, error) {
+	result, err := r.db.CheckExistedUserAuthByEmail(ctx, &email)
+	if err != nil {
+		return false, err
+	}
 	return result, nil
 }
 
-func (r *AuthRepository) RegisterWithEmail(ctx context.Context, user UsersAuth) error {
-	result, err := r.db.RegisterWithEmail(ctx, user.ID, user.Email, user.Phone, user.HashedPassword, user.CreatedAt, user.UpdatedAt)
-
+func (r *UserRepository) GetUserAuthByEmail(ctx context.Context, email string) (*UserAuth, error) {
+	user, err := r.db.GetUserAuthByEmail(ctx, &email)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return &UserAuth{
+		ID:           user.ID,
+		Email:        *user.Email,
+		PasswordHash: user.PasswordHash,
+		CreatedAt:    user.CreatedAt.Time,
+	}, nil
 }
+
+func (r *UserRepository) RegisterWithEmail(ctx context.Context, email, passwordHash string) (*UserAuth, error) {
+	params := database.RegisterWithEmailParams{
+		Email:        &email,
+		PasswordHash: passwordHash,
+	}
+
+	user, err := r.db.RegisterWithEmail(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	return &UserAuth{
+		ID:           user.ID,
+		Email:        *user.Email,
+		PasswordHash: user.PasswordHash,
+		CreatedAt:    user.CreatedAt.Time,
+	}, nil
+}
+
