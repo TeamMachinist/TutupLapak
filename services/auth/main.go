@@ -4,10 +4,10 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/teammachinist/tutuplapak/internal"
+	"github.com/teammachinist/tutuplapak/internal/cache"
 
 	"github.com/caarlos0/env/v8"
 	"github.com/gin-gonic/gin"
@@ -36,15 +36,11 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	redisURL := os.Getenv("REDIS_URL")
-	if redisURL == "" {
-		redisURL = "redis://localhost:6379"
-	}
-
 	// Initialize database
 	ctx := context.Background()
 	db, err := internal.NewDatabase(ctx, cfg.DatabaseURL)
 	if err != nil {
+		log.Printf("Database connection failed: %v", err)
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
@@ -57,15 +53,23 @@ func main() {
 	}
 	jwtService := internal.NewJWTService(jwtConfig)
 
-	// Initialize cache
-	cache := internal.NewCacheService(redisURL)
-	defer cache.Close()
+	// Initialize Redis cache
+	redisCache := cache.NewRedisCache(cache.CacheConfig{
+		Addr:     cfg.RedisAddr,
+		Password: cfg.RedisPassword,
+		DB:       cfg.RedisDB,
+	})
+	defer func() {
+		if err := redisCache.Close(); err != nil {
+			log.Printf("Failed to close Redis connection: %v", err)
+		}
+	}()
 
 	// Initialize layers
 	userRepo := NewUserRepository(db.Queries)
 	userService := NewUserService(userRepo, *jwtService, db.Queries)
 	userHandler := NewUserHandler(userService)
-	healthHandler := NewHealthHandler(db.Pool, cache)
+	healthHandler := NewHealthHandler(db.Pool, redisCache)
 
 	router := gin.Default()
 

@@ -1,8 +1,12 @@
 package api
 
 import (
+	"encoding/json"
+	"net/http"
 	"regexp"
 	"strings"
+
+	"github.com/teammachinist/tutuplapak/internal/logger"
 )
 
 // Standard API response format
@@ -38,6 +42,51 @@ func ValidationFailed(errors []ValidationError) Response {
 		Error:  "validation failed",
 		Data:   ValidationErrors{Errors: errors},
 	}
+}
+
+// Essential HTTP response writers
+func WriteResponse(w http.ResponseWriter, r *http.Request, statusCode int, response Response) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		logger.ErrorCtx(r.Context(), "Failed to encode API response", "error", err, "status_code", statusCode)
+		// Fallback to basic error response
+		http.Error(w, `{"status":"error","error":"internal server error"}`, http.StatusInternalServerError)
+	}
+}
+
+func WriteSuccess(w http.ResponseWriter, r *http.Request, data interface{}) {
+	WriteResponse(w, r, http.StatusOK, Success(data))
+}
+
+func WriteCreated(w http.ResponseWriter, r *http.Request, data interface{}) {
+	WriteResponse(w, r, http.StatusCreated, Success(data))
+}
+
+func WriteError(w http.ResponseWriter, r *http.Request, statusCode int, message string) {
+	WriteResponse(w, r, statusCode, Error(message))
+}
+
+func WriteValidationError(w http.ResponseWriter, r *http.Request, errors []ValidationError) {
+	WriteResponse(w, r, http.StatusBadRequest, ValidationFailed(errors))
+}
+
+// Most commonly used error responses
+func WriteBadRequest(w http.ResponseWriter, r *http.Request, message string) {
+	WriteError(w, r, http.StatusBadRequest, message)
+}
+
+func WriteNotFound(w http.ResponseWriter, r *http.Request, message string) {
+	WriteError(w, r, http.StatusNotFound, message)
+}
+
+func WriteUnauthorized(w http.ResponseWriter, r *http.Request, message string) {
+	WriteError(w, r, http.StatusUnauthorized, message)
+}
+
+func WriteInternalServerError(w http.ResponseWriter, r *http.Request, message string) {
+	WriteError(w, r, http.StatusInternalServerError, message)
 }
 
 // Common validation functions
