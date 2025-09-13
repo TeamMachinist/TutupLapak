@@ -34,6 +34,7 @@ type Querier interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (Users, error)
 	GetUserByPhone(ctx context.Context, phone *string) (Users, error)
 	GetUserWithAuth(ctx context.Context, id uuid.UUID) (GetUserWithAuthRow, error)
+	GetUserWithFileId(ctx context.Context, id uuid.UUID) (GetUserWithFileIdRow, error)
 	RegisterWithEmail(ctx context.Context, arg RegisterWithEmailParams) (UsersAuth, error)
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (UpdateProductRow, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (Users, error)

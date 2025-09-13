@@ -59,7 +59,18 @@ func main() {
 		products.Post("", productHandler.CreateProduct)
 		products.Put("/:productId", productHandler.UpdateProduct)
 		products.Delete("/:productId", productHandler.DeleteProduct)
+	}
 
+	userRepo := repositories.NewUserRepository(database.Queries)
+
+	userService := services.NewUserService(userRepo)
+
+	userHandler := handlers.NewUserHandler(userService)
+
+	user := api.Group("/user")
+	{
+		user.Get("", userHandler.GetUserWithFileId)
+		user.Put("", userHandler.UpdateUser)
 	}
 
 	c := make(chan os.Signal, 1)

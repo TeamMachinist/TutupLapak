@@ -28,9 +28,10 @@ INSERT INTO users_auth (
 
 -- Insert sample users
 INSERT INTO users (
-    id, user_auth_id, email, phone, bank_account_name, bank_account_holder, bank_account_number
+    id, user_auth_id, file_id, email, phone, bank_account_name, bank_account_holder, bank_account_number
 ) VALUES (
     '00000000-0000-0000-0000-000000000010',
+    '00000000-0000-0000-0000-000000000000',
     '00000000-0000-0000-0000-000000000000', 
     'tutuplapak@projectsprint.com', 
     '', 
@@ -39,7 +40,8 @@ INSERT INTO users (
     '1234567890'
 ), (
     '00000000-0000-0000-0000-000000000011',
-    '00000000-0000-0000-0000-000000000001', 
+    '00000000-0000-0000-0000-000000000001',
+    '00000000-0000-0000-0000-000000000000', 
     '', 
     '+628562856285', 
     'Buka Jalan Corp', 
@@ -47,7 +49,8 @@ INSERT INTO users (
     '0987654321'
 ), (
     '00000000-0000-0000-0000-000000000012',
-    '00000000-0000-0000-0000-000000000002', 
+    '00000000-0000-0000-0000-000000000002',
+    '00000000-0000-0000-0000-000000000100', 
     'seller@example.com',
     '+628123456789',
     'Seller Business',
@@ -56,6 +59,7 @@ INSERT INTO users (
 ), (
     '00000000-0000-0000-0000-000000000013',
     '00000000-0000-0000-0000-000000000003',
+    '00000000-0000-0000-0000-000000000200',
     'buyer@example.com',
     '+628987654321',
     'Buyer Account',

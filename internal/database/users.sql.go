@@ -204,6 +204,48 @@ func (q *Queries) GetUserWithAuth(ctx context.Context, id uuid.UUID) (GetUserWit
 	return i, err
 }
 
+const getUserWithFileId = `-- name: GetUserWithFileId :one
+SELECT 
+    u.email,
+    u.phone,
+    f.id,
+    f.file_uri,
+    f.file_thumbnail_uri,
+    u.bank_account_name,
+    u.bank_account_holder,
+    u.bank_account_number
+FROM users u
+JOIN files f ON u.id = f.user_id
+WHERE u.id = $1
+`
+
+type GetUserWithFileIdRow struct {
+	Email             *string   `json:"email"`
+	Phone             *string   `json:"phone"`
+	ID                uuid.UUID `json:"id"`
+	FileUri           string    `json:"file_uri"`
+	FileThumbnailUri  string    `json:"file_thumbnail_uri"`
+	BankAccountName   *string   `json:"bank_account_name"`
+	BankAccountHolder *string   `json:"bank_account_holder"`
+	BankAccountNumber *string   `json:"bank_account_number"`
+}
+
+func (q *Queries) GetUserWithFileId(ctx context.Context, id uuid.UUID) (GetUserWithFileIdRow, error) {
+	row := q.db.QueryRow(ctx, getUserWithFileId, id)
+	var i GetUserWithFileIdRow
+	err := row.Scan(
+		&i.Email,
+		&i.Phone,
+		&i.ID,
+		&i.FileUri,
+		&i.FileThumbnailUri,
+		&i.BankAccountName,
+		&i.BankAccountHolder,
+		&i.BankAccountNumber,
+	)
+	return i, err
+}
+
 const updateUser = `-- name: UpdateUser :one
 UPDATE users SET
     email = COALESCE($2, email),

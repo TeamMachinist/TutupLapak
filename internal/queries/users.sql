@@ -61,3 +61,17 @@ SELECT
 FROM users u
 JOIN users_auth ua ON u.user_auth_id = ua.id
 WHERE u.id = $1;
+
+-- name: GetUserWithFileId :one
+SELECT 
+    u.email,
+    u.phone,
+    f.id,
+    f.file_uri,
+    f.file_thumbnail_uri,
+    u.bank_account_name,
+    u.bank_account_holder,
+    u.bank_account_number
+FROM users u
+JOIN files f ON u.id = f.user_id
+WHERE u.id = $1;
