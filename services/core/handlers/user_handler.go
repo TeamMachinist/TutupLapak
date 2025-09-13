@@ -31,18 +31,18 @@ func (h *UserHandler) GetUserWithFileId(c *fiber.Ctx) error {
 func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 	ctx := c.Context()
 
-	userIdStr := c.Params("id")
-	userId, err := uuid.Parse(userIdStr)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid product id format",
-		})
-	}
+	userId:= uuid.MustParse("00000000-0000-0000-0000-000000000012")
+	// userId, err := uuid.Parse(userIdStr)
+	// if err != nil {
+	// 	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+	// 		"error": "invalid product id format",
+	// 	})
+	// }
 
-	var req models.UserRequest
-	if err := c.BodyParser(req); err != nil {
+	req := models.UserRequest{}
+	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid request body",
+			"error": err.Error(),
 		})
 	}
 

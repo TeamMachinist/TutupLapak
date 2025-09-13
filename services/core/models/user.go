@@ -12,7 +12,7 @@ type User struct {
 }
 
 type UserRequest struct {
-	FileID            uuid.UUID `json:"fileId"`
+	FileID            string    `json:"fileId"`
 	BankAccountName   string    `json:"bankAccountName"`
 	BankAccountHolder string    `json:"bankAccountHolder"`
 	BankAccountNumber string    `json:"bankAccountNumber"`

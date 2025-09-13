@@ -40,7 +40,6 @@ func (s *UserService) UpdateUser(ctx context.Context,
 
 	rows, err := s.userRepo.UpdateUser(ctx, database.UpdateUserParams{
 		ID:                userId,
-		// FileID:            req.FileID,
 		BankAccountName:   &req.BankAccountName,
 		BankAccountHolder: &req.BankAccountHolder,
 		BankAccountNumber: &req.BankAccountNumber,
