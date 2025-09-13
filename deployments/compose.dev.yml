@@ -31,6 +31,7 @@ services:
     ports:
       - "${AUTH_PORT}:${AUTH_PORT}"
     environment:
+      - ENV=development
       - PORT=${AUTH_PORT}
       - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET}
@@ -55,6 +56,7 @@ services:
     ports:
       - "${CORE_PORT}:${CORE_PORT}"
     environment:
+      - ENV=development
       - PORT=${CORE_PORT}
       - API_TIMEOUT=${API_TIMEOUT}
       - DATABASE_URL=${DATABASE_URL}
@@ -82,6 +84,7 @@ services:
     ports:
       - "${FILES_PORT}:${FILES_PORT}"
     environment:
+      - ENV=development
       - PORT=${FILES_PORT}
       - DATABASE_URL=${DATABASE_URL}
       - MINIO_ENDPOINT=${MINIO_ENDPOINT}
