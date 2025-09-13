@@ -117,7 +117,7 @@ func (s *UserService) RegisterByPhone(ctx context.Context, phone, password strin
 	user, err := s.db.CreateUser(ctx, database.CreateUserParams{
 		ID:         uuid.New(),
 		UserAuthID: userAuth.ID,
-		Phone:      &userAuth.Phone,
+		Phone:      userAuth.Phone,
 	})
 	if err != nil {
 		return nil, errors.New("failed to create user")
@@ -222,7 +222,7 @@ func (s *UserService) RegisterWithEmail(ctx context.Context, email, password str
 	user, err := s.db.CreateUser(ctx, database.CreateUserParams{
 		ID:         uuid.New(),
 		UserAuthID: userAuth.ID,
-		Email:      &userAuth.Email,
+		Email:      userAuth.Email,
 	})
 
 	// Generate token

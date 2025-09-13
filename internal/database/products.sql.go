@@ -79,7 +79,7 @@ INSERT INTO products (
     $9,
     $10
 )
-RETURNING id, name, category, qty, price, sku, file_id, user_id, created_at, updated_at
+RETURNING id, name, category, qty, price, sku, user_id, file_id, created_at, updated_at
 `
 
 type CreateProductParams struct {
@@ -116,8 +116,8 @@ func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (P
 		&i.Qty,
 		&i.Price,
 		&i.Sku,
-		&i.FileID,
 		&i.UserID,
+		&i.FileID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -171,11 +171,24 @@ type GetAllProductsParams struct {
 	Sku         string    `json:"sku"`
 	Category    string    `json:"category"`
 	SortBy      string    `json:"sort_by"`
-	OffsetCount int32     `json:"offset_count"`
-	LimitCount  int32     `json:"limit_count"`
+	OffsetCount int       `json:"offset_count"`
+	LimitCount  int       `json:"limit_count"`
 }
 
-func (q *Queries) GetAllProducts(ctx context.Context, arg GetAllProductsParams) ([]Products, error) {
+type GetAllProductsRow struct {
+	ID        uuid.UUID `json:"id"`
+	Name      string    `json:"name"`
+	Category  string    `json:"category"`
+	Qty       int       `json:"qty"`
+	Price     int       `json:"price"`
+	Sku       string    `json:"sku"`
+	FileID    uuid.UUID `json:"file_id"`
+	UserID    uuid.UUID `json:"user_id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+func (q *Queries) GetAllProducts(ctx context.Context, arg GetAllProductsParams) ([]GetAllProductsRow, error) {
 	rows, err := q.db.Query(ctx, getAllProducts,
 		arg.ProductID,
 		arg.Sku,
@@ -188,9 +201,9 @@ func (q *Queries) GetAllProducts(ctx context.Context, arg GetAllProductsParams) 
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Products{}
+	items := []GetAllProductsRow{}
 	for rows.Next() {
-		var i Products
+		var i GetAllProductsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
@@ -229,9 +242,22 @@ FROM products
 WHERE id = $1
 `
 
-func (q *Queries) GetProductByID(ctx context.Context, id uuid.UUID) (Products, error) {
+type GetProductByIDRow struct {
+	ID        uuid.UUID `json:"id"`
+	Name      string    `json:"name"`
+	Category  string    `json:"category"`
+	Qty       int       `json:"qty"`
+	Price     int       `json:"price"`
+	Sku       string    `json:"sku"`
+	FileID    uuid.UUID `json:"file_id"`
+	UserID    uuid.UUID `json:"user_id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+func (q *Queries) GetProductByID(ctx context.Context, id uuid.UUID) (GetProductByIDRow, error) {
 	row := q.db.QueryRow(ctx, getProductByID, id)
-	var i Products
+	var i GetProductByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,

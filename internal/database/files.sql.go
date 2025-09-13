@@ -16,8 +16,7 @@ INSERT INTO files (
   id, user_id, file_uri, file_thumbnail_uri
 ) VALUES (
   $1, $2, $3, $4
-)
-RETURNING id, user_id, file_uri, file_thumbnail_uri, created_at
+) RETURNING id, user_id, file_uri, file_thumbnail_uri, created_at
 `
 
 type CreateFileParams struct {
@@ -46,8 +45,7 @@ func (q *Queries) CreateFile(ctx context.Context, arg CreateFileParams) (Files, 
 }
 
 const deleteFile = `-- name: DeleteFile :exec
-DELETE FROM files
-WHERE id = $1
+DELETE FROM files WHERE id = $1
 `
 
 func (q *Queries) DeleteFile(ctx context.Context, id uuid.UUID) error {
@@ -56,8 +54,7 @@ func (q *Queries) DeleteFile(ctx context.Context, id uuid.UUID) error {
 }
 
 const getFile = `-- name: GetFile :one
-SELECT id, user_id, file_uri, file_thumbnail_uri, created_at FROM files
-WHERE id = $1 LIMIT 1
+SELECT id, user_id, file_uri, file_thumbnail_uri, created_at FROM files WHERE id = $1
 `
 
 func (q *Queries) GetFile(ctx context.Context, id uuid.UUID) (Files, error) {
@@ -74,7 +71,7 @@ func (q *Queries) GetFile(ctx context.Context, id uuid.UUID) (Files, error) {
 }
 
 const getFileByIDAndUserID = `-- name: GetFileByIDAndUserID :one
-SELECT id, user_id, file_uri, file_thumbnail_uri, created_at FROM files WHERE id = $1::uuid AND user_id = $2::uuid LIMIT 1
+SELECT id, user_id, file_uri, file_thumbnail_uri, created_at FROM files WHERE id = $1 AND user_id = $2
 `
 
 type GetFileByIDAndUserIDParams struct {
