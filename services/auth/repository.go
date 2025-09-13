@@ -54,3 +54,45 @@ func (r *UserRepository) CreateUserByPhone(ctx context.Context, phone, passwordH
 		CreatedAt:    user.CreatedAt.Time,
 	}, nil
 }
+
+func (r *UserRepository) CheckExistedUserAuthByEmail(ctx context.Context, email string) (bool, error) {
+	result, err := r.db.CheckExistedUserAuthByEmail(ctx, &email)
+	if err != nil {
+		return false, err
+	}
+	return result, nil
+}
+
+func (r *UserRepository) GetUserAuthByEmail(ctx context.Context, email string) (*UserAuth, error) {
+	user, err := r.db.GetUserAuthByEmail(ctx, &email)
+	if err != nil {
+		return nil, err
+	}
+
+	return &UserAuth{
+		ID:           user.ID,
+		Email:        *user.Email,
+		PasswordHash: user.PasswordHash,
+		CreatedAt:    user.CreatedAt.Time,
+	}, nil
+}
+
+func (r *UserRepository) RegisterWithEmail(ctx context.Context, email, passwordHash string) (*UserAuth, error) {
+	params := database.RegisterWithEmailParams{
+		Email:        &email,
+		PasswordHash: passwordHash,
+	}
+
+	user, err := r.db.RegisterWithEmail(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	return &UserAuth{
+		ID:           user.ID,
+		Email:        *user.Email,
+		PasswordHash: user.PasswordHash,
+		CreatedAt:    user.CreatedAt.Time,
+	}, nil
+}
+

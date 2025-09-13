@@ -33,7 +33,7 @@ func NewUserService(userRepo *UserRepository, jwtService internal.JWTService, db
 	}
 }
 
-func (s *UserService) LoginByPhone(ctx context.Context, phone, password string) (*LoginResponse, error) {
+func (s *UserService) LoginByPhone(ctx context.Context, phone, password string) (*LoginPhoneResponse, error) {
 	// Validate phone format
 	if err := s.validatePhone(phone); err != nil {
 		return nil, err
@@ -70,13 +70,13 @@ func (s *UserService) LoginByPhone(ctx context.Context, phone, password string) 
 		return nil, errors.New("failed to generate token")
 	}
 
-	return &LoginResponse{
+	return &LoginPhoneResponse{
 		Phone: userAuth.Phone,
 		Token: token,
 	}, nil
 }
 
-func (s *UserService) RegisterByPhone(ctx context.Context, phone, password string) (*LoginResponse, error) {
+func (s *UserService) RegisterByPhone(ctx context.Context, phone, password string) (*LoginPhoneResponse, error) {
 	// Validate inputs
 	if err := s.validatePhone(phone); err != nil {
 		return nil, err
@@ -125,8 +125,108 @@ func (s *UserService) RegisterByPhone(ctx context.Context, phone, password strin
 		return nil, errors.New("failed to generate token")
 	}
 
-	return &LoginResponse{
-		Phone: *user.Phone,
+	return &LoginPhoneResponse{
+		Phone: userAuth.Phone,
+		Token: token,
+	}, nil
+}
+
+func (s *UserService) LoginWithEmail(ctx context.Context, email, password string) (*LoginEmailResponse, error) {
+	// Validate email format
+	if err := s.validateEmail(email); err != nil {
+		return nil, err
+	}
+
+	// Validate password
+	if err := s.validatePassword(password); err != nil {
+		return nil, err
+	}
+
+	// Validate user auth by email
+	userAuth, err := s.userRepo.GetUserAuthByEmail(ctx, email)
+	if err != nil {
+		return nil, errors.New("email not found")
+	}
+
+	// Check password
+	if !CheckPassword(password, userAuth.PasswordHash) {
+		return nil, errors.New("invalid credentials")
+	}
+
+	fmt.Println("----------------")
+	fmt.Printf("userAuth: %+v\n", userAuth)
+
+	// Get user, hit db directly for development purpose
+	user, err := s.db.GetUserByAuthID(ctx, userAuth.ID)
+
+	fmt.Printf("user: %+v\n", user)
+	fmt.Println("----------------")
+
+	// Generate JWT token
+	token, err := s.jwtService.GenerateToken(user.ID.String())
+	if err != nil {
+		return nil, errors.New("failed to generate token")
+	}
+
+	return &LoginEmailResponse{
+		Email: userAuth.Email,
+		Token: token,
+	}, nil
+}
+
+func (s *UserService) RegisterWithEmail(ctx context.Context, email, password string) (*LoginEmailResponse, error) {
+	// Validate email format
+	if err := s.validateEmail(email); err != nil {
+		return nil, err
+	}
+
+	// Validate password
+	if err := s.validatePassword(password); err != nil {
+		return nil, err
+	}
+
+	// Check if email already exists
+	exists, err := s.userRepo.CheckExistedUserAuthByEmail(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return nil, errors.New("email address already exists")
+	}
+
+	// Hash password
+	passwordHash, err := HashPassword(password)
+	if err != nil {
+		return nil, errors.New("failed to hash password")
+	}
+
+	// Create user auth
+	userAuth, err := s.userRepo.RegisterWithEmail(ctx, email, passwordHash)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			if pgErr.Code == "23505" {
+				return nil, errors.New("email address already exists")
+			}
+		}
+		return nil, err
+	}
+
+	// Create user, hit db directly for development purpose
+	user, err := s.db.CreateUser(ctx, database.CreateUserParams{
+		ID:         uuid.New(),
+		UserAuthID: userAuth.ID,
+		Email:      &userAuth.Email,
+	})
+
+	// Generate token
+	token, err := s.jwtService.GenerateToken(user.ID.String())
+	if err != nil {
+		return nil, errors.New("failed to generate token")
+	}
+
+	return &LoginEmailResponse{
+		Email: userAuth.Email,
 		Token: token,
 	}, nil
 }
@@ -145,6 +245,20 @@ func (s *UserService) validatePhone(phone string) error {
 	phoneRegex := regexp.MustCompile(`^\+[1-9]\d{1,14}$`)
 	if !phoneRegex.MatchString(phone) {
 		return errors.New("invalid phone number format")
+	}
+
+	return nil
+}
+
+func (s *UserService) validateEmail(email string) error {
+	if email == "" {
+		return errors.New("email is required")
+	}
+
+	// Validate email format (international format)
+	emailRegex := regexp.MustCompile(`^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,4}$`)
+	if !emailRegex.MatchString(email) {
+		return errors.New("invalid email address format")
 	}
 
 	return nil

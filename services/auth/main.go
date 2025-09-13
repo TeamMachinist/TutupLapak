@@ -78,6 +78,8 @@ func main() {
 	v1 := router.Group("/api/v1")
 	v1.POST("/login/phone", userHandler.LoginByPhone)
 	v1.POST("/register/phone", userHandler.RegisterByPhone)
+	v1.POST("/login/email", userHandler.LoginWithEmail)
+	v1.POST("/register/email", userHandler.RegisterWithEmail)
 
 	// Simple token generation endpoint for testing
 	v1.POST("/token", func(c *gin.Context) {
