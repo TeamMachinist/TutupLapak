@@ -5,6 +5,8 @@ import (
 	"context"
 
 	// "github.com/teammachinist/tutuplapak/clients"
+	"github.com/google/uuid"
+	"github.com/teammachinist/tutuplapak/services/core/clients"
 	"github.com/teammachinist/tutuplapak/services/core/models"
 	"github.com/teammachinist/tutuplapak/services/core/repositories"
 )
@@ -15,16 +17,16 @@ type PurchaseServiceInterface interface {
 
 type PurchaseService struct {
 	purchaseRepo repositories.PurchaseRepositoryInterface
-	// fileClient   clients.FileClientInterface // ← Ganti dari ProductService ke FileClient
+	fileClient   clients.FileClientInterface
 }
 
 func NewPurchaseService(
 	purchaseRepo repositories.PurchaseRepositoryInterface,
-	// fileClient clients.FileClientInterface, // ← Inject fileClient
+	fileClient clients.FileClientInterface,
 ) PurchaseServiceInterface {
 	return &PurchaseService{
 		purchaseRepo: purchaseRepo,
-		// fileClient:   fileClient,
+		fileClient:   fileClient,
 	}
 }
 
@@ -36,17 +38,16 @@ func (s *PurchaseService) CreatePurchase(ctx context.Context, req models.Purchas
 		return models.PurchaseResponse{}, err
 	}
 
-	// // ✅ ISI FILE URI & THUMBNAIL — langsung dari fileClient
-	// for i, item := range resp.PurchasedItems {
-	// 	if item.FileID != uuid.Nil && s.fileClient != nil {
-	// 		fileMeta, err := s.fileClient.GetFileByID(ctx, item.FileID)
-	// 		if err == nil {
-	// 			resp.PurchasedItems[i].FileURI = fileMeta.URI
-	// 			resp.PurchasedItems[i].FileThumbnailURI = fileMeta.ThumbnailURI
-	// 		}
-	// 		// Jika error, biarkan string kosong
-	// 	}
-	// }
+	for i, item := range resp.PurchasedItems {
+		if item.FileID != uuid.Nil && s.fileClient != nil {
+			fileMeta, err := s.fileClient.GetFileByID(ctx, item.FileID, item.UserID.String())
+			if err == nil {
+				resp.PurchasedItems[i].FileURI = fileMeta.FileURI
+				resp.PurchasedItems[i].FileThumbnailURI = fileMeta.FileThumbnailURI
+			}
+			// Jika error, biarkan kosong
+		}
+	}
 
 	return resp, nil
 }

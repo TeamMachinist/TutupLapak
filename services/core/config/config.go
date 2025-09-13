@@ -16,8 +16,8 @@ type Config struct {
 
 type AppConfig struct {
 	Port       string
-	Env        string
 	APITimeout time.Duration
+	FileUrl    string
 }
 
 type DatabaseConfig struct {
@@ -49,7 +49,8 @@ func Load() (*Config, error) {
 
 	config := &Config{
 		App: AppConfig{
-			Port: getEnv("PORT", "8002"),
+			Port:    getEnv("PORT", "8002"),
+			FileUrl: getEnv("FILES_SERVICE_URL", "http://localhost:8003"),
 		},
 		Database: DatabaseConfig{
 			Host:        getEnv("DB_HOST", "localhost"),
