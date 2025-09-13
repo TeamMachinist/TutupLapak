@@ -3,12 +3,13 @@ package main
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
 // User Models
 type UserAuth struct {
-	ID           string    `json:"id"`
+	ID           uuid.UUID `json:"id"`
 	Phone        string    `json:"phone"`
 	PasswordHash string    `json:"-"`
 	CreatedAt    time.Time `json:"created_at"`

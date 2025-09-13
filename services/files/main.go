@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/teammachinist/tutuplapak/internal"
@@ -15,8 +14,13 @@ import (
 )
 
 type Config struct {
-	HTTPPort    string `env:"HTTP_PORT" envDefault:"8080"`
+	HTTPPort    string `env:"PORT" envDefault:"8003"`
 	DatabaseURL string `env:"DATABASE_URL"`
+
+	// JWT Configuration
+	JWTSecret   string        `env:"JWT_SECRET" envDefault:"tutupsecret"`
+	JWTDuration time.Duration `env:"JWT_DURATION" envDefault:"24h"`
+	JWTIssuer   string        `env:"JWT_ISSUER" envDefault:"tutuplapak-auth"`
 
 	// MinIO Configuration
 	MinIOEndpoint       string `env:"MINIO_ENDPOINT" envDefault:"localhost:9000"`
@@ -46,6 +50,15 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to connect the database:", err)
 	}
+	defer db.Close()
+
+	// Initialize JWT service for token validation
+	jwtConfig := &internal.JWTConfig{
+		Key:      cfg.JWTSecret,
+		Duration: cfg.JWTDuration,
+		Issuer:   cfg.JWTIssuer,
+	}
+	jwtService := internal.NewJWTService(jwtConfig)
 
 	// Initialize MinIO storage
 	minioConfig := &MinIOConfig{
@@ -72,7 +85,7 @@ func main() {
 	r.Handle("/static/*", http.StripPrefix("/static/", fs))
 
 	r.Route("/api/v1/", func(r chi.Router) {
-		r.Use(dummyUserMiddleware)
+		r.Use(jwtService.ChiMiddleware)
 		r.Post("/file", fileHandler.UploadFile)
 		r.Get("/file/{fileId}", fileHandler.GetFile)
 		r.Delete("/file/{fileId}", fileHandler.DeleteFile)
@@ -80,21 +93,7 @@ func main() {
 	})
 
 	r.Get("/healthz", healthHandler)
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8003"
-	}
-	log.Printf("Files service starting on port %s", port)
 
-	log.Fatal(http.ListenAndServe(":"+port, r))
-	db.Close()
-}
-
-// Temporary middleware for testing (add to main.go if needed)
-func dummyUserMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Add dummy user ID to context for testing
-		ctx := internal.WithUserID(r.Context(), "22222222-2222-2222-2222-222222222222") // Dummy UUID
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+	log.Printf("Files service starting on port %s", cfg.HTTPPort)
+	log.Fatal(http.ListenAndServe(":"+cfg.HTTPPort, r))
 }

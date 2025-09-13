@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/teammachinist/tutuplapak/internal/database"
 )
@@ -30,7 +29,7 @@ func (r *UserRepository) GetUserByPhone(ctx context.Context, phone string) (*Use
 	}
 
 	return &UserAuth{
-		ID:           fmt.Sprintf("%x", user.ID),
+		ID:           user.ID,
 		Phone:        *user.Phone,
 		PasswordHash: user.PasswordHash,
 		CreatedAt:    user.CreatedAt.Time,
@@ -49,7 +48,7 @@ func (r *UserRepository) CreateUserByPhone(ctx context.Context, phone, passwordH
 	}
 
 	return &UserAuth{
-		ID:           fmt.Sprintf("%x", user.ID),
+		ID:           user.ID,
 		Phone:        *user.Phone,
 		PasswordHash: user.PasswordHash,
 		CreatedAt:    user.CreatedAt.Time,

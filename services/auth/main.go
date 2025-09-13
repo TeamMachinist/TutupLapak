@@ -63,7 +63,7 @@ func main() {
 
 	// Initialize layers
 	userRepo := NewUserRepository(db.Queries)
-	userService := NewUserService(userRepo, *jwtService)
+	userService := NewUserService(userRepo, *jwtService, db.Queries)
 	userHandler := NewUserHandler(userService)
 	healthHandler := NewHealthHandler(db.Pool, cache)
 
