@@ -25,7 +25,7 @@ type CreatePurchaseParams struct {
 	SenderContactDetail string    `json:"sender_contact_detail"`
 	PurchasedItems      []byte    `json:"purchased_items"`
 	PaymentDetails      []byte    `json:"payment_details"`
-	TotalPrice          int32     `json:"total_price"`
+	TotalPrice          int       `json:"total_price"`
 }
 
 func (q *Queries) CreatePurchase(ctx context.Context, arg CreatePurchaseParams) error {

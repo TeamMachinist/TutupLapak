@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS users (
-    id UUID PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_auth_id UUID NOT NULL REFERENCES users_auth(id) ON DELETE CASCADE,
     file_id UUID,
     email VARCHAR(255),
@@ -7,8 +7,8 @@ CREATE TABLE IF NOT EXISTS users (
     bank_account_name VARCHAR(255),
     bank_account_holder VARCHAR(255),
     bank_account_number VARCHAR(50),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_users_email ON users(email);

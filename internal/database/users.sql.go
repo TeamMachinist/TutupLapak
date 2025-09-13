@@ -7,9 +7,9 @@ package database
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createUser = `-- name: CreateUser :one
@@ -23,11 +23,11 @@ INSERT INTO users (
 type CreateUserParams struct {
 	ID                uuid.UUID `json:"id"`
 	UserAuthID        uuid.UUID `json:"user_auth_id"`
-	Email             *string   `json:"email"`
-	Phone             *string   `json:"phone"`
-	BankAccountName   *string   `json:"bank_account_name"`
-	BankAccountHolder *string   `json:"bank_account_holder"`
-	BankAccountNumber *string   `json:"bank_account_number"`
+	Email             string    `json:"email"`
+	Phone             string    `json:"phone"`
+	BankAccountName   string    `json:"bank_account_name"`
+	BankAccountHolder string    `json:"bank_account_holder"`
+	BankAccountNumber string    `json:"bank_account_number"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (Users, error) {
@@ -91,7 +91,7 @@ const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT id, user_auth_id, file_id, email, phone, bank_account_name, bank_account_holder, bank_account_number, created_at, updated_at FROM users WHERE email = $1
 `
 
-func (q *Queries) GetUserByEmail(ctx context.Context, email *string) (Users, error) {
+func (q *Queries) GetUserByEmail(ctx context.Context, email string) (Users, error) {
 	row := q.db.QueryRow(ctx, getUserByEmail, email)
 	var i Users
 	err := row.Scan(
@@ -135,7 +135,7 @@ const getUserByPhone = `-- name: GetUserByPhone :one
 SELECT id, user_auth_id, file_id, email, phone, bank_account_name, bank_account_holder, bank_account_number, created_at, updated_at FROM users WHERE phone = $1
 `
 
-func (q *Queries) GetUserByPhone(ctx context.Context, phone *string) (Users, error) {
+func (q *Queries) GetUserByPhone(ctx context.Context, phone string) (Users, error) {
 	row := q.db.QueryRow(ctx, getUserByPhone, phone)
 	var i Users
 	err := row.Scan(
@@ -172,17 +172,17 @@ WHERE u.id = $1
 `
 
 type GetUserWithAuthRow struct {
-	ID                uuid.UUID          `json:"id"`
-	UserAuthID        uuid.UUID          `json:"user_auth_id"`
-	Email             *string            `json:"email"`
-	Phone             *string            `json:"phone"`
-	BankAccountName   *string            `json:"bank_account_name"`
-	BankAccountHolder *string            `json:"bank_account_holder"`
-	BankAccountNumber *string            `json:"bank_account_number"`
-	CreatedAt         pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
-	PasswordHash      string             `json:"password_hash"`
-	AuthCreatedAt     pgtype.Timestamptz `json:"auth_created_at"`
+	ID                uuid.UUID `json:"id"`
+	UserAuthID        uuid.UUID `json:"user_auth_id"`
+	Email             string    `json:"email"`
+	Phone             string    `json:"phone"`
+	BankAccountName   string    `json:"bank_account_name"`
+	BankAccountHolder string    `json:"bank_account_holder"`
+	BankAccountNumber string    `json:"bank_account_number"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
+	PasswordHash      string    `json:"password_hash"`
+	AuthCreatedAt     time.Time `json:"auth_created_at"`
 }
 
 func (q *Queries) GetUserWithAuth(ctx context.Context, id uuid.UUID) (GetUserWithAuthRow, error) {
@@ -218,11 +218,11 @@ RETURNING id, user_auth_id, file_id, email, phone, bank_account_name, bank_accou
 
 type UpdateUserParams struct {
 	ID                uuid.UUID `json:"id"`
-	Email             *string   `json:"email"`
-	Phone             *string   `json:"phone"`
-	BankAccountName   *string   `json:"bank_account_name"`
-	BankAccountHolder *string   `json:"bank_account_holder"`
-	BankAccountNumber *string   `json:"bank_account_number"`
+	Email             string    `json:"email"`
+	Phone             string    `json:"phone"`
+	BankAccountName   string    `json:"bank_account_name"`
+	BankAccountHolder string    `json:"bank_account_holder"`
+	BankAccountNumber string    `json:"bank_account_number"`
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (Users, error) {
@@ -260,7 +260,7 @@ RETURNING id, user_auth_id, file_id, email, phone, bank_account_name, bank_accou
 
 type UpdateUserEmailParams struct {
 	ID    uuid.UUID `json:"id"`
-	Email *string   `json:"email"`
+	Email string    `json:"email"`
 }
 
 func (q *Queries) UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams) (Users, error) {
@@ -291,7 +291,7 @@ RETURNING id, user_auth_id, file_id, email, phone, bank_account_name, bank_accou
 
 type UpdateUserPhoneParams struct {
 	ID    uuid.UUID `json:"id"`
-	Phone *string   `json:"phone"`
+	Phone string    `json:"phone"`
 }
 
 func (q *Queries) UpdateUserPhone(ctx context.Context, arg UpdateUserPhoneParams) (Users, error) {

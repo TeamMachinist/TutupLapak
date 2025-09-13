@@ -56,11 +56,11 @@ func (ns NullPurchaseStatus) Value() (driver.Value, error) {
 }
 
 type Files struct {
-	ID               uuid.UUID          `json:"id"`
-	UserID           uuid.UUID          `json:"user_id"`
-	FileUri          string             `json:"file_uri"`
-	FileThumbnailUri string             `json:"file_thumbnail_uri"`
-	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	ID               uuid.UUID `json:"id"`
+	UserID           uuid.UUID `json:"user_id"`
+	FileUri          string    `json:"file_uri"`
+	FileThumbnailUri string    `json:"file_thumbnail_uri"`
+	CreatedAt        time.Time `json:"created_at"`
 }
 
 type Products struct {
@@ -70,42 +70,43 @@ type Products struct {
 	Qty       int       `json:"qty"`
 	Price     int       `json:"price"`
 	Sku       string    `json:"sku"`
-	FileID    uuid.UUID `json:"file_id"`
 	UserID    uuid.UUID `json:"user_id"`
+	FileID    uuid.UUID `json:"file_id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type Purchases struct {
-	ID                  uuid.UUID          `json:"id"`
-	SenderName          string             `json:"sender_name"`
-	SenderContactType   string             `json:"sender_contact_type"`
-	SenderContactDetail string             `json:"sender_contact_detail"`
-	PurchasedItems      []byte             `json:"purchased_items"`
-	PaymentDetails      []byte             `json:"payment_details"`
-	TotalPrice          int32              `json:"total_price"`
-	Status              PurchaseStatus     `json:"status"`
-	CreatedAt           pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	ID                  uuid.UUID      `json:"id"`
+	SenderName          string         `json:"sender_name"`
+	SenderContactType   string         `json:"sender_contact_type"`
+	SenderContactDetail string         `json:"sender_contact_detail"`
+	PurchasedItems      []byte         `json:"purchased_items"`
+	PaymentDetails      []byte         `json:"payment_details"`
+	TotalPrice          int            `json:"total_price"`
+	Status              PurchaseStatus `json:"status"`
+	CreatedAt           time.Time      `json:"created_at"`
+	UpdatedAt           time.Time      `json:"updated_at"`
 }
 
 type Users struct {
-	ID                uuid.UUID          `json:"id"`
-	UserAuthID        uuid.UUID          `json:"user_auth_id"`
-	FileID            pgtype.UUID        `json:"file_id"`
-	Email             *string            `json:"email"`
-	Phone             *string            `json:"phone"`
-	BankAccountName   *string            `json:"bank_account_name"`
-	BankAccountHolder *string            `json:"bank_account_holder"`
-	BankAccountNumber *string            `json:"bank_account_number"`
-	CreatedAt         pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	ID                uuid.UUID   `json:"id"`
+	UserAuthID        uuid.UUID   `json:"user_auth_id"`
+	FileID            pgtype.UUID `json:"file_id"`
+	Email             string      `json:"email"`
+	Phone             string      `json:"phone"`
+	BankAccountName   string      `json:"bank_account_name"`
+	BankAccountHolder string      `json:"bank_account_holder"`
+	BankAccountNumber string      `json:"bank_account_number"`
+	CreatedAt         time.Time   `json:"created_at"`
+	UpdatedAt         time.Time   `json:"updated_at"`
 }
 
 type UsersAuth struct {
-	ID           uuid.UUID          `json:"id"`
-	Email        *string            `json:"email"`
-	Phone        *string            `json:"phone"`
-	PasswordHash string             `json:"password_hash"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	ID           uuid.UUID `json:"id"`
+	Email        string    `json:"email"`
+	Phone        string    `json:"phone"`
+	PasswordHash string    `json:"password_hash"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
