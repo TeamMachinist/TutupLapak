@@ -31,12 +31,20 @@ type DatabaseConfig struct {
 }
 
 type JWTConfig struct {
-	Secret string
+	Secret   string        `json:"secret"`
+	Duration time.Duration `json:"duration"`
+	Issuer   string        `json:"issuer"`
 }
 
 func Load() (*Config, error) {
 	if err := godotenv.Load(); err != nil {
 		fmt.Println("No .env file found, using environment variables")
+	}
+
+	jwtDurationStr := getEnv("JWT_DURATION", "24h")
+	jwtDuration, _ := time.ParseDuration(jwtDurationStr)
+	if jwtDuration == 0 {
+		jwtDuration = 24 * time.Hour
 	}
 
 	config := &Config{
@@ -51,6 +59,11 @@ func Load() (*Config, error) {
 			DBName:      getEnv("DB_NAME", "myapp"),
 			SSLMode:     getEnv("DB_SSL_MODE", "disable"),
 			DatabaseURL: getEnv("DATABASE_URL", ""),
+		},
+		JWT: JWTConfig{
+			Secret:   getEnv("JWT_SECRET", "your-super-secret-key-change-in-production"),
+			Duration: jwtDuration,
+			Issuer:   getEnv("JWT_ISSUER", "tutuplapak-core-service"),
 		},
 	}
 

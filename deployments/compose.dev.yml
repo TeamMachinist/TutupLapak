@@ -105,6 +105,18 @@ services:
     networks:
       - tutuplapak-network
 
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # Main Database
   main-db:
     image: postgres:15-alpine
@@ -128,7 +140,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-  
+
   minio:
     image: minio/minio:latest
     container_name: tutuplapak-minio
