@@ -85,19 +85,21 @@ func (r *ProductRepository) CheckSKUExistsByUser(ctx context.Context, sku string
 }
 
 func (r *ProductRepository) GetAllProducts(ctx context.Context, params models.GetAllProductsParams) ([]models.Product, error) {
-	limit := int32(5)
-	if params.Limit > 0 {
-		limit = int32(params.Limit)
-	}
+	// limit := int32(5)
+	// if params.Limit > 0 {
+	// 	limit = int32(params.Limit)
+	// }
 
-	offset := int32(0)
-	if params.Offset >= 0 {
-		offset = int32(params.Offset)
-	}
+	// offset := int32(0)
+	// if params.Offset >= 0 {
+	// 	offset = int32(params.Offset)
+	// }
 
 	args := database.GetAllProductsParams{
-		LimitCount:  limit,
-		OffsetCount: offset,
+		// LimitCount:  limit,
+		// OffsetCount: offset,
+		LimitCount:  params.Limit,
+		OffsetCount: params.Offset,
 		ProductID:   uuid.Nil,
 		Sku:         "",
 		Category:    "",

@@ -32,8 +32,13 @@ func main() {
 	}
 	defer database.Close()
 
+	var enablePrefork bool
+	if cfg.App.Env == "production" {
+		enablePrefork = true
+	}
+
 	app := fiber.New(fiber.Config{
-		Prefork: true,
+		Prefork: enablePrefork,
 		AppName: "Core Service v1.0",
 	})
 

@@ -113,18 +113,24 @@ func (r *PurchaseRepository) CreatePurchase(ctx context.Context, req models.Purc
 		}
 
 		bankAccountName := ""
-		if userInTx.BankAccountName != nil {
-			bankAccountName = *userInTx.BankAccountName
+		// if userInTx.BankAccountName != nil {
+		if userInTx.BankAccountName != "" {
+			// bankAccountName = *userInTx.BankAccountName
+			bankAccountName = userInTx.BankAccountName
 		}
 
 		bankAccountHolder := ""
-		if userInTx.BankAccountHolder != nil {
-			bankAccountHolder = *userInTx.BankAccountHolder
+		// if userInTx.BankAccountHolder != nil {
+		if userInTx.BankAccountHolder != "" {
+			// bankAccountHolder = *userInTx.BankAccountHolder
+			bankAccountHolder = userInTx.BankAccountHolder
 		}
 
 		bankAccountNumber := ""
-		if userInTx.BankAccountNumber != nil {
-			bankAccountNumber = *userInTx.BankAccountNumber
+		// if userInTx.BankAccountNumber != nil {
+		if userInTx.BankAccountNumber != "" {
+			// bankAccountNumber = *userInTx.BankAccountNumber
+			bankAccountNumber = userInTx.BankAccountNumber
 		}
 
 		paymentDetails = append(paymentDetails, models.PaymentDetail{
@@ -159,7 +165,8 @@ func (r *PurchaseRepository) CreatePurchase(ctx context.Context, req models.Purc
 		SenderContactDetail: req.SenderContactDetail,
 		PurchasedItems:      snapshotsJSON,
 		PaymentDetails:      paymentDetailsJSON,
-		TotalPrice:          int32(grandTotal),
+		TotalPrice:          grandTotal,
+		// TotalPrice:          int32(grandTotal),
 	}
 	err = q.CreatePurchase(ctx, createParams)
 	if err != nil {
