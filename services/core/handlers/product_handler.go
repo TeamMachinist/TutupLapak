@@ -299,7 +299,7 @@ func (h *ProductHandler) UpdateProduct(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
 		case err.Error() == "sku already exists for your account":
 			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": err.Error()})
-		case err.Error() == "file not found or invalid":
+		case err.Error() == "fileId is not valid / exists":
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 		case err.Error() == "product not found":
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})

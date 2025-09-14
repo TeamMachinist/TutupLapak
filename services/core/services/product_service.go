@@ -186,10 +186,6 @@ func (s *ProductService) UpdateProduct(
 		if err != nil {
 			return models.ProductResponse{}, errors.New("fileId is not valid / exists")
 		}
-		if file.UserID != userID.String() {
-			return models.ProductResponse{}, errors.New("fileId is not valid / exists")
-		}
-
 		fileMetadata = file
 	}
 
