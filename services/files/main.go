@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/teammachinist/tutuplapak/internal"
@@ -25,7 +28,7 @@ type Config struct {
 	JWTIssuer   string        `env:"JWT_ISSUER" envDefault:"tutuplapak-auth"`
 
 	// Redis Configuration
-	RedisAddr     string `env:"REDIS_ADDR" envDefault:"redis:6379"`
+	RedisAddr     string `env:"REDIS_ADDR" envDefault:"localhost:6379"`
 	RedisPassword string `env:"REDIS_PASSWORD" envDefault:""`
 	RedisDB       int    `env:"REDIS_DB" envDefault:"0"`
 
@@ -38,54 +41,49 @@ type Config struct {
 	MinIOUseSSL         bool   `env:"MINIO_USE_SSL" envDefault:"false"`
 }
 
-// Request ID middleware
-func requestIDMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := logger.WithRequestID(r.Context())
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+type Dependencies struct {
+	DB         *internal.DB
+	RedisCache *cache.RedisCache
+	JWTService *internal.JWTService
+	MinIO      *MinIOStorage
 }
 
-func healthHandler(ctx context.Context, db *internal.DB, redisCache *cache.RedisCache) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		requestCtx := r.Context()
-		logger.InfoCtx(requestCtx, "Health check request received", "remote_addr", r.RemoteAddr)
-
-		// Check database
-		if err := db.HealthCheck(ctx); err != nil {
-			logger.ErrorCtx(requestCtx, "Health check failed - database ping error", "error", err)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusServiceUnavailable)
-			w.Write([]byte(`{"status":"unhealthy","service":"files","error":"database unavailable"}`))
-			return
-		}
-
-		// Check Redis
-		if err := redisCache.Ping(ctx); err != nil {
-			logger.WarnCtx(requestCtx, "Health check warning - Redis ping failed", "error", err)
-			// Don't fail health check for Redis - it's not critical for basic functionality
-		}
-
-		logger.InfoCtx(requestCtx, "Health check passed")
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"healthy","service":"files","database":"ok","cache":"ok"}`))
-	}
+type Services struct {
+	FileService FileService
+	FileHandler *FileHandler
 }
 
 func main() {
-	// Initialize logger first
+	// 1. Initialize logger
+	initializeLogger()
+
+	// 2. Load configuration
+	cfg := loadConfiguration()
+
+	// 3. Setup dependencies
+	deps := setupDependencies(cfg)
+	defer cleanupDependencies(deps)
+
+	// 4. Setup services & handlers
+	services := setupServices(deps)
+
+	// 5. Setup routes
+	router := setupRoutes(services, deps)
+
+	// 6. Start server with graceful shutdown
+	startServerWithShutdown(router, cfg)
+}
+
+func initializeLogger() {
 	logger.Init()
 	logger.Info("Starting Files service")
+}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	// Parse configuration
+func loadConfiguration() Config {
 	cfg := Config{}
 	if err := env.Parse(&cfg); err != nil {
 		logger.Error("Failed to load config", "error", err)
-		panic(err)
+		os.Exit(1)
 	}
 
 	logger.Info("Configuration loaded",
@@ -93,36 +91,38 @@ func main() {
 		"jwt_issuer", cfg.JWTIssuer,
 		"minio_endpoint", cfg.MinIOEndpoint,
 		"minio_bucket", cfg.MinIOBucket,
+		"redis_addr", cfg.RedisAddr,
 	)
 
+	return cfg
+}
+
+func setupDependencies(cfg Config) Dependencies {
 	// Connect to database
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	db, err := internal.NewDatabase(ctx, cfg.DatabaseURL)
 	if err != nil {
 		logger.Error("Database connection failed", "error", err, "url", cfg.DatabaseURL)
-		panic(err)
+		os.Exit(1)
 	}
-	defer db.Close()
-
 	logger.Info("Database connected successfully")
 
 	// Initialize Redis cache
-	redisCache := cache.NewRedisCache(cache.CacheConfig{
+	redisConfig := cache.CacheConfig{
 		Addr:     cfg.RedisAddr,
 		Password: cfg.RedisPassword,
 		DB:       cfg.RedisDB,
-	})
-	defer func() {
-		if err := redisCache.Close(); err != nil {
-			logger.Error("Failed to close Redis connection", "error", err)
-		}
-	}()
+	}
+	redisCache := cache.NewRedisCache(redisConfig)
 
 	// Test Redis connection (non-blocking)
 	if err := redisCache.Ping(ctx); err != nil {
 		logger.Warn("Redis connection failed - running without cache", "error", err)
 	}
 
-	// Initialize JWT service for token validation
+	// Initialize JWT service
 	jwtConfig := &internal.JWTConfig{
 		Key:      cfg.JWTSecret,
 		Duration: cfg.JWTDuration,
@@ -144,65 +144,183 @@ func main() {
 	minioStorage, err := NewMinIOStorage(minioConfig)
 	if err != nil {
 		logger.Error("Failed to initialize MinIO storage", "error", err, "endpoint", cfg.MinIOEndpoint)
-		panic(err)
+		os.Exit(1)
 	}
 	logger.Info("MinIO storage initialized", "endpoint", cfg.MinIOEndpoint, "bucket", cfg.MinIOBucket)
 
-	// Initialize services
-	fileService := NewFileService(db.Queries, redisCache)
-	fileHandler := NewFileHandler(minioStorage, fileService)
+	return Dependencies{
+		DB:         db,
+		RedisCache: redisCache,
+		JWTService: jwtService,
+		MinIO:      minioStorage,
+	}
+}
 
-	// Setup router with middleware
+func setupServices(deps Dependencies) Services {
+	fileService := NewFileService(deps.DB.Queries, deps.RedisCache)
+	fileHandler := NewFileHandler(deps.MinIO, fileService)
+
+	return Services{
+		FileService: fileService,
+		FileHandler: fileHandler,
+	}
+}
+
+func setupRoutes(services Services, deps Dependencies) *chi.Mux {
 	r := chi.NewRouter()
 
 	// Add middleware
 	r.Use(requestIDMiddleware)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(30 * time.Second))
-
-	// Add request logging middleware
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			start := time.Now()
-			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
-
-			next.ServeHTTP(ww, r)
-
-			logger.InfoCtx(r.Context(), "Request completed",
-				"method", r.Method,
-				"path", r.URL.Path,
-				"status", ww.Status(),
-				"bytes", ww.BytesWritten(),
-				"duration_ms", time.Since(start).Milliseconds(),
-				"user_agent", r.UserAgent(),
-			)
-		})
-	})
+	r.Use(requestLoggerMiddleware)
 
 	// Static files
 	fs := http.FileServer(http.Dir("static"))
 	r.Handle("/static/*", http.StripPrefix("/static/", fs))
 
-	// Health check (no auth required)
-	r.Get("/healthz", healthHandler(ctx, db, redisCache))
-
 	// API routes with authentication
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Use(jwtService.ChiMiddleware)
-		r.Post("/file", fileHandler.UploadFile)
-		r.Get("/file/{fileId}", fileHandler.GetFile)
-		r.Delete("/file/{fileId}", fileHandler.DeleteFile)
+		r.Use(deps.JWTService.ChiMiddleware)
+		r.Post("/file", services.FileHandler.UploadFile)
+		r.Get("/file/{fileId}", services.FileHandler.GetFile)
+		r.Delete("/file/{fileId}", services.FileHandler.DeleteFile)
 	})
 
-	logger.Info("Files service starting", "port", cfg.HTTPPort)
+	// Health check (no auth required)
+	r.Get("/healthz", healthHandler(deps.DB, deps.RedisCache))
 
+	return r
+}
+
+func startServerWithShutdown(router *chi.Mux, cfg Config) {
+	// Create HTTP server
 	server := &http.Server{
 		Addr:         ":" + cfg.HTTPPort,
-		Handler:      r,
+		Handler:      router,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
 
-	logger.Error("Server stopped", "error", server.ListenAndServe())
+	// Channel to listen for interrupt signals
+	serverErrors := make(chan error, 1)
+
+	// Start HTTP server in goroutine
+	go func() {
+		logger.Info("Files service starting", "port", cfg.HTTPPort, "addr", server.Addr)
+		serverErrors <- server.ListenAndServe()
+	}()
+
+	// Channel to listen for OS signals
+	shutdown := make(chan os.Signal, 1)
+	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
+
+	// Wait for either server error or shutdown signal
+	select {
+	case err := <-serverErrors:
+		if err != http.ErrServerClosed {
+			logger.Error("Server failed to start", "error", err)
+			os.Exit(1)
+		}
+
+	case sig := <-shutdown:
+		logger.Info("Shutdown signal received", "signal", sig.String())
+
+		// Create shutdown context with timeout
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer shutdownCancel()
+
+		// Attempt graceful shutdown
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			logger.Error("Failed to shutdown server gracefully", "error", err)
+
+			// Force close if graceful shutdown fails
+			if closeErr := server.Close(); closeErr != nil {
+				logger.Error("Failed to force close server", "error", closeErr)
+				os.Exit(1)
+			}
+			os.Exit(1)
+		}
+
+		logger.Info("Server shutdown completed gracefully")
+	}
+}
+
+func cleanupDependencies(deps Dependencies) {
+	logger.Info("Cleaning up dependencies")
+
+	if deps.RedisCache != nil {
+		if err := deps.RedisCache.Close(); err != nil {
+			logger.Error("Failed to close Redis connection", "error", err)
+		}
+	}
+
+	if deps.DB != nil {
+		deps.DB.Close()
+		logger.Info("Database connection closed")
+	}
+}
+
+// Request ID middleware
+func requestIDMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := logger.WithRequestID(r.Context())
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// Request logging middleware
+func requestLoggerMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+
+		next.ServeHTTP(ww, r)
+
+		logger.InfoCtx(r.Context(), "Request completed",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", ww.Status(),
+			"bytes", ww.BytesWritten(),
+			"duration_ms", time.Since(start).Milliseconds(),
+			"user_agent", r.UserAgent(),
+		)
+	})
+}
+
+// Health handler
+func healthHandler(db *internal.DB, redisCache *cache.RedisCache) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := context.Background()
+		requestCtx := r.Context()
+		logger.InfoCtx(requestCtx, "Health check request received", "remote_addr", r.RemoteAddr)
+
+		// Check database
+		if err := db.HealthCheck(ctx); err != nil {
+			logger.ErrorCtx(requestCtx, "Health check failed - database ping error", "error", err)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte(`{"status":"unhealthy","service":"files","error":"database unavailable"}`))
+			return
+		}
+
+		// Check Redis (non-critical)
+		redisOk := true
+		if err := redisCache.Ping(ctx); err != nil {
+			logger.WarnCtx(requestCtx, "Health check warning - Redis ping failed", "error", err)
+			redisOk = false
+		}
+
+		logger.InfoCtx(requestCtx, "Health check passed", "redis_ok", redisOk)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+
+		status := "ok"
+		if !redisOk {
+			status = "degraded"
+		}
+
+		w.Write([]byte(`{"status":"healthy","service":"files","database":"ok","cache":"` + status + `"}`))
+	}
 }

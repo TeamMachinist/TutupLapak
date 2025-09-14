@@ -206,51 +206,43 @@ func (s FileService) DeleteFiles(ctx context.Context, fileID uuid.UUID, userID s
 func (s FileService) GetUserFiles(ctx context.Context, userID string) ([]File, error) {
 	logger.DebugCtx(ctx, "Getting user files", "user_id", userID)
 
-	// Try cache first
 	cacheKey := fmt.Sprintf(cache.UserFileListKey, userID)
-	var cachedFiles []File
+	var files []File
 
-	if err := s.cache.Get(ctx, cacheKey, &cachedFiles); err == nil {
-		logger.DebugCtx(ctx, "User files retrieved from cache", "user_id", userID, "count", len(cachedFiles))
-		return cachedFiles, nil
-	}
+	err := s.cache.GetOrSet(ctx, cacheKey, &files, cache.FileListTTL, func() (interface{}, error) {
+		logger.DebugCtx(ctx, "User files cache miss - querying database", "user_id", userID)
 
-	// Cache miss - get from database
-	logger.DebugCtx(ctx, "User files cache miss - querying database", "user_id", userID)
-
-	userUUID, err := uuid.Parse(userID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid user ID: %w", err)
-	}
-
-	dbFiles, err := s.queries.GetFilesByUser(ctx, userUUID)
-	if err != nil {
-		logger.ErrorCtx(ctx, "Failed to get user files from database", "error", err, "user_id", userID)
-		return nil, fmt.Errorf("failed to get user files: %w", err)
-	}
-
-	// Convert database files to our File model
-	files := make([]File, len(dbFiles))
-	for i, dbFile := range dbFiles {
-		files[i] = File{
-			ID:               dbFile.ID,
-			UserID:           dbFile.UserID,
-			FileURI:          dbFile.FileUri,
-			FileThumbnailURI: dbFile.FileThumbnailUri,
-			CreatedAt:        dbFile.CreatedAt,
+		userUUID, err := uuid.Parse(userID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid user ID: %w", err)
 		}
+
+		dbFiles, err := s.queries.GetFilesByUser(ctx, userUUID)
+		if err != nil {
+			logger.ErrorCtx(ctx, "Failed to get user files from database", "error", err, "user_id", userID)
+			return nil, fmt.Errorf("failed to get user files: %w", err)
+		}
+
+		// Convert database files to our File model
+		fileList := make([]File, len(dbFiles))
+		for i, dbFile := range dbFiles {
+			fileList[i] = File{
+				ID:               dbFile.ID,
+				UserID:           dbFile.UserID,
+				FileURI:          dbFile.FileUri,
+				FileThumbnailURI: dbFile.FileThumbnailUri,
+				CreatedAt:        dbFile.CreatedAt,
+			}
+		}
+
+		return fileList, nil
+	})
+
+	if err != nil {
+		return nil, err
 	}
 
-	// Cache the user's file list
-	if err := s.cache.Set(ctx, cacheKey, files, cache.FileListTTL); err != nil {
-		logger.WarnCtx(ctx, "Failed to cache user file list",
-			"error", err,
-			"user_id", userID,
-			"cache_key", cacheKey,
-		)
-	}
-
-	logger.InfoCtx(ctx, "User files retrieved from database", "user_id", userID, "count", len(files))
+	logger.InfoCtx(ctx, "User files retrieved successfully", "user_id", userID, "count", len(files))
 	return files, nil
 }
 
