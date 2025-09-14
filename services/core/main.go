@@ -57,12 +57,15 @@ func main() {
 
 	productRepo := repositories.NewProductRepository(database.Queries)
 	purchaseRepo := repositories.NewPurchaseRepository(database.Pool)
+	userRepo := repositories.NewUserRepository(database.Queries)
 
 	productService := services.NewProductService(productRepo, fileClient)
 	purchaseService := services.NewPurchaseService(purchaseRepo, fileClient)
+	userService := services.NewUserService(userRepo, fileClient)
 
 	productHandler := handlers.NewProductHandler(productService)
 	purchaseHandler := handlers.NewPurchaseHandler(purchaseService)
+	userHandler := handlers.NewUserHandler(userService)
 
 	api := app.Group("/api/v1")
 
@@ -73,6 +76,13 @@ func main() {
 		products.Put("/:productId", jwtService.FiberMiddleware(), productHandler.UpdateProduct)
 		products.Delete("/:productId", jwtService.FiberMiddleware(), productHandler.DeleteProduct)
 	}
+
+	// User management endpoints (auth-protected)
+	user := api.Group("/user")
+	{
+		user.Post("/link/phone", jwtService.FiberMiddleware(), userHandler.LinkPhone)
+	}
+
 	purchase := api.Group("/purchase")
 	{
 		purchase.Post("", purchaseHandler.CreatePurchase)

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 
-	"github.com/google/uuid"
 	"github.com/teammachinist/tutuplapak/internal/database"
 )
 
@@ -95,20 +94,4 @@ func (r *UserRepository) RegisterWithEmail(ctx context.Context, email, passwordH
 		PasswordHash: user.PasswordHash,
 		CreatedAt:    user.CreatedAt.Time,
 	}, nil
-}
-
-func (r *UserRepository) UpdateUserPhone(ctx context.Context, userID, phone string) error {
-	_, err := r.db.UpdateUserPhone(ctx, database.UpdateUserPhoneParams{
-		ID:    uuid.MustParse(userID),
-		Phone: &phone,
-	})
-	return err
-}
-
-func (r *UserRepository) GetUserByID(ctx context.Context, userID string) (*database.Users, error) {
-	user, err := r.db.GetUserByID(ctx, uuid.MustParse(userID))
-	if err != nil {
-		return nil, err
-	}
-	return &user, nil
 }
