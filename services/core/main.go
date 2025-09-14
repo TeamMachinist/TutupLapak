@@ -8,6 +8,8 @@ import (
 	"syscall"
 
 	"github.com/teammachinist/tutuplapak/internal"
+	"github.com/teammachinist/tutuplapak/internal/cache"
+	"github.com/teammachinist/tutuplapak/internal/logger"
 	"github.com/teammachinist/tutuplapak/services/core/clients"
 	"github.com/teammachinist/tutuplapak/services/core/config"
 	"github.com/teammachinist/tutuplapak/services/core/handlers"
@@ -15,7 +17,7 @@ import (
 	"github.com/teammachinist/tutuplapak/services/core/services"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/logger"
+	fiberlog "github.com/gofiber/fiber/v2/middleware/logger"
 )
 
 func main() {
@@ -26,11 +28,16 @@ func main() {
 		log.Fatal("Failed to load config:", err)
 	}
 
+	logger.Init()
+
 	database, err := internal.NewDatabase(ctx, cfg.Database.DatabaseURL)
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
 	defer database.Close()
+
+	redisClient := cache.NewRedisCache(cache.CacheConfig(cfg.Redis))
+	defer redisClient.Close()
 
 	var enablePrefork bool
 	if cfg.App.Env == "production" {
@@ -42,7 +49,7 @@ func main() {
 		AppName: "Core Service v1.0",
 	})
 
-	app.Use(logger.New())
+	app.Use(fiberlog.New())
 
 	app.Get("/healthz", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
@@ -63,7 +70,7 @@ func main() {
 	productRepo := repositories.NewProductRepository(database.Queries)
 	purchaseRepo := repositories.NewPurchaseRepository(database.Pool)
 
-	productService := services.NewProductService(productRepo, fileClient)
+	productService := services.NewProductService(productRepo, fileClient, redisClient)
 	purchaseService := services.NewPurchaseService(purchaseRepo, fileClient)
 
 	productHandler := handlers.NewProductHandler(productService)
