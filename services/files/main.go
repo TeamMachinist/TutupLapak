@@ -179,16 +179,19 @@ func setupRoutes(services Services, deps Dependencies) *chi.Mux {
 	fs := http.FileServer(http.Dir("static"))
 	r.Handle("/static/*", http.StripPrefix("/static/", fs))
 
+	// Health check (no auth required)
+	r.Get("/healthz", healthHandler(deps.DB, deps.RedisCache))
+
+	// Pragmatically no auth for now, to ease fetch by core service (purchase)
+	r.Get("/api/v1/file/{fileId}", services.FileHandler.GetFile)
+
 	// API routes with authentication
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(deps.JWTService.ChiMiddleware)
 		r.Post("/file", services.FileHandler.UploadFile)
-		r.Get("/file/{fileId}", services.FileHandler.GetFile)
+		// r.Get("/file/{fileId}", services.FileHandler.GetFile)
 		r.Delete("/file/{fileId}", services.FileHandler.DeleteFile)
 	})
-
-	// Health check (no auth required)
-	r.Get("/healthz", healthHandler(deps.DB, deps.RedisCache))
 
 	return r
 }

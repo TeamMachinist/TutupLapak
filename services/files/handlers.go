@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"image"
 	"image/jpeg"
@@ -34,20 +33,6 @@ func NewFileHandler(minioStorage *MinIOStorage, fileService FileService) *FileHa
 	}
 }
 
-// HTTP status code mapping helper
-func writeAPIResponse(w http.ResponseWriter, r *http.Request, statusCode int, response api.Response) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		logger.ErrorCtx(r.Context(), "Failed to encode API response", "error", err)
-	}
-}
-
-func writeAPIError(w http.ResponseWriter, r *http.Request, statusCode int, message string) {
-	writeAPIResponse(w, r, statusCode, api.Error(message))
-}
-
 func (h *FileHandler) DeleteFile(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	fileIdStr := chi.URLParam(r, "fileId")
@@ -58,7 +43,7 @@ func (h *FileHandler) DeleteFile(w http.ResponseWriter, r *http.Request) {
 	fileId, err := uuid.Parse(fileIdStr)
 	if err != nil {
 		logger.WarnCtx(ctx, "Invalid file ID format", "file_id", fileIdStr, "error", err)
-		writeAPIError(w, r, http.StatusBadRequest, "Invalid file ID format")
+		api.WriteBadRequest(w, r, "Invalid file ID format")
 		return
 	}
 
@@ -66,7 +51,7 @@ func (h *FileHandler) DeleteFile(w http.ResponseWriter, r *http.Request) {
 	userID, ok := internal.GetUserIDFromChi(r)
 	if !ok {
 		logger.ErrorCtx(ctx, "Missing user ID from auth context")
-		writeAPIError(w, r, http.StatusUnauthorized, "Unauthorized")
+		api.WriteUnauthorized(w, r, "Unauthorized")
 		return
 	}
 
@@ -75,22 +60,25 @@ func (h *FileHandler) DeleteFile(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if err.Error() == "file not found" || err.Error() == "not found" {
 			logger.WarnCtx(ctx, "File not found for deletion", "file_id", fileId, "user_id", userID)
-			writeAPIError(w, r, http.StatusNotFound, "File not found")
+			api.WriteNotFound(w, r, "File not found")
 			return
 		}
 		if err.Error() == "unauthorized" || err.Error() == "forbidden" {
 			logger.WarnCtx(ctx, "Unauthorized file deletion attempt", "file_id", fileId, "user_id", userID)
-			writeAPIError(w, r, http.StatusForbidden, "You can only delete your own files")
+			api.WriteError(w, r, http.StatusForbidden, "You can only delete your own files")
 			return
 		}
 
 		logger.ErrorCtx(ctx, "Failed to delete file", "file_id", fileId, "user_id", userID, "error", err)
-		writeAPIError(w, r, http.StatusInternalServerError, "Failed to delete file")
+		api.WriteInternalServerError(w, r, "Failed to delete file")
 		return
 	}
 
 	logger.InfoCtx(ctx, "File deleted successfully", "file_id", fileId, "user_id", userID)
-	writeAPIResponse(w, r, http.StatusOK, api.Success(map[string]string{"message": "File deleted successfully"}))
+
+	// Return simple success message as per spec
+	response := map[string]string{"message": "File deleted successfully"}
+	api.WriteSuccess(w, r, response)
 }
 
 func (h *FileHandler) GetFile(w http.ResponseWriter, r *http.Request) {
@@ -103,7 +91,7 @@ func (h *FileHandler) GetFile(w http.ResponseWriter, r *http.Request) {
 	fileId, err := uuid.Parse(fileIdStr)
 	if err != nil {
 		logger.WarnCtx(ctx, "Invalid file ID format", "file_id", fileIdStr, "error", err)
-		writeAPIError(w, r, http.StatusBadRequest, "Invalid file ID format")
+		api.WriteBadRequest(w, r, "Invalid file ID format")
 		return
 	}
 
@@ -112,12 +100,12 @@ func (h *FileHandler) GetFile(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if err.Error() == "file not found" || err.Error() == "not found" {
 			logger.WarnCtx(ctx, "File not found", "file_id", fileId)
-			writeAPIError(w, r, http.StatusNotFound, "File not found")
+			api.WriteNotFound(w, r, "File not found")
 			return
 		}
 
 		logger.ErrorCtx(ctx, "Failed to get file", "file_id", fileId, "error", err)
-		writeAPIError(w, r, http.StatusInternalServerError, "Failed to retrieve file")
+		api.WriteInternalServerError(w, r, "Failed to retrieve file")
 		return
 	}
 
@@ -131,7 +119,7 @@ func (h *FileHandler) GetFile(w http.ResponseWriter, r *http.Request) {
 		"created_at":         file.CreatedAt,
 	}
 
-	writeAPIResponse(w, r, http.StatusOK, api.Success(response))
+	api.WriteSuccess(w, r, response)
 }
 
 func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
@@ -144,7 +132,7 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 	userID, ok := internal.GetUserIDFromChi(r)
 	if !ok {
 		logger.ErrorCtx(requestCtx, "Missing user ID from auth context")
-		writeAPIError(w, r, http.StatusUnauthorized, "Unauthorized")
+		api.WriteUnauthorized(w, r, "Unauthorized")
 		return
 	}
 
@@ -152,7 +140,7 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		logger.WarnCtx(requestCtx, "Failed to parse multipart form", "error", err)
-		writeAPIError(w, r, http.StatusBadRequest, "Invalid file upload request")
+		api.WriteBadRequest(w, r, "Invalid file upload request")
 		return
 	}
 	defer file.Close()
@@ -172,7 +160,7 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 			"max_size", maxFileSize,
 			"filename", header.Filename,
 		)
-		writeAPIError(w, r, http.StatusBadRequest, "File size exceeds 100KiB limit")
+		api.WriteBadRequest(w, r, "File size exceeds 100KiB limit")
 		return
 	}
 
@@ -193,7 +181,7 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 			"filename", header.Filename,
 			"valid_extensions", validExts,
 		)
-		writeAPIError(w, r, http.StatusBadRequest, "Only JPG, JPEG, and PNG files are allowed")
+		api.WriteBadRequest(w, r, "Only JPG, JPEG, and PNG files are allowed")
 		return
 	}
 
@@ -214,7 +202,7 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 			"file_id", fileId,
 			"filename", header.Filename,
 		)
-		writeAPIError(w, r, http.StatusInternalServerError, "Failed to upload file")
+		api.WriteInternalServerError(w, r, "Failed to upload file")
 		return
 	}
 
@@ -224,7 +212,7 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 	buffer, err := io.ReadAll(file)
 	if err != nil {
 		logger.ErrorCtx(requestCtx, "Failed to read file buffer", "error", err, "file_id", fileId)
-		writeAPIError(w, r, http.StatusInternalServerError, "Failed to process file")
+		api.WriteInternalServerError(w, r, "Failed to process file")
 		return
 	}
 
@@ -232,7 +220,7 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 	compressedImage, imageSize, err := h.compressImageNFNT(buffer, 10, "uploads")
 	if err != nil {
 		logger.ErrorCtx(requestCtx, "Failed to create thumbnail", "error", err, "file_id", fileId)
-		writeAPIError(w, r, http.StatusInternalServerError, "Failed to create thumbnail")
+		api.WriteInternalServerError(w, r, "Failed to create thumbnail")
 		return
 	}
 
@@ -247,7 +235,7 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 			"file_id", fileId,
 			"compressed_name", compressedImageName,
 		)
-		writeAPIError(w, r, http.StatusInternalServerError, "Failed to upload thumbnail")
+		api.WriteInternalServerError(w, r, "Failed to upload thumbnail")
 		return
 	}
 
@@ -257,7 +245,7 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 	userUUID, err := uuid.Parse(userID)
 	if err != nil {
 		logger.ErrorCtx(requestCtx, "Invalid user ID format", "user_id", userID, "error", err)
-		writeAPIError(w, r, http.StatusBadRequest, "Invalid user ID")
+		api.WriteBadRequest(w, r, "Invalid user ID")
 		return
 	}
 
@@ -276,7 +264,7 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 			"file_id", fileId,
 			"user_id", userID,
 		)
-		writeAPIError(w, r, http.StatusInternalServerError, "Failed to save file record")
+		api.WriteInternalServerError(w, r, "Failed to save file record")
 		return
 	}
 
@@ -287,14 +275,14 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 		"thumbnail_uri", compressedImageUri,
 	)
 
-	// Response matches spec format (no user_id exposed)
+	// Response matches spec format (no user_id exposed) - return data directly
 	response := map[string]interface{}{
 		"id":                 createdFile.ID,
 		"file_uri":           createdFile.FileURI,
 		"file_thumbnail_uri": createdFile.FileThumbnailURI,
 	}
 
-	writeAPIResponse(w, r, http.StatusOK, api.Success(response))
+	api.WriteSuccess(w, r, response)
 }
 
 // NFNT compression function - same approach as bimg
@@ -324,18 +312,3 @@ func (h *FileHandler) compressImageNFNT(buffer []byte, quality int, dirname stri
 
 	return processed.Bytes(), int64(processed.Len()), nil
 }
-
-// Original bimg compression function (commented)
-// func (h *FileHandler) compressImageBimg(buffer []byte, quality int, dirname string) ([]byte, int64, error) {
-// 	converted, err := bimg.NewImage(buffer).Convert(bimg.JPEG) // convert image to JPEG
-// 	if err != nil {
-// 		return nil, 0, err
-// 	}
-// 	//compress the image
-// 	processed, err := bimg.NewImage(converted).Process(bimg.Options{Quality: quality, StripMetadata: true})
-// 	if err != nil {
-// 		return nil, 0, err
-// 	}
-
-// 	return processed, int64(len(processed)), nil
-// }

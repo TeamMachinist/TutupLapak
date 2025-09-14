@@ -9,15 +9,7 @@ import (
 	"github.com/teammachinist/tutuplapak/internal/logger"
 )
 
-// Standard API response format
-type Response struct {
-	Status  string      `json:"status"`
-	Data    interface{} `json:"data,omitempty"`
-	Error   string      `json:"error,omitempty"`
-	Message string      `json:"message,omitempty"`
-}
-
-// Validation errors
+// Validation errors (only for validation failed responses)
 type ValidationError struct {
 	Field   string `json:"field"`
 	Message string `json:"message"`
@@ -27,49 +19,37 @@ type ValidationErrors struct {
 	Errors []ValidationError `json:"errors"`
 }
 
-// Response constructors
-func Success(data interface{}) Response {
-	return Response{Status: "success", Data: data}
-}
-
-func Error(message string) Response {
-	return Response{Status: "error", Error: message}
-}
-
-func ValidationFailed(errors []ValidationError) Response {
-	return Response{
-		Status: "error",
-		Error:  "validation failed",
-		Data:   ValidationErrors{Errors: errors},
-	}
-}
-
-// Essential HTTP response writers
-func WriteResponse(w http.ResponseWriter, r *http.Request, statusCode int, response Response) {
+// HTTP response writers - return data directly as per spec
+func WriteJSON(w http.ResponseWriter, r *http.Request, statusCode int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		logger.ErrorCtx(r.Context(), "Failed to encode API response", "error", err, "status_code", statusCode)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		logger.ErrorCtx(r.Context(), "Failed to encode JSON response", "error", err, "status_code", statusCode)
 		// Fallback to basic error response
-		http.Error(w, `{"status":"error","error":"internal server error"}`, http.StatusInternalServerError)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
 
+// Success responses (200, 201) - return data directly
 func WriteSuccess(w http.ResponseWriter, r *http.Request, data interface{}) {
-	WriteResponse(w, r, http.StatusOK, Success(data))
+	WriteJSON(w, r, http.StatusOK, data)
 }
 
 func WriteCreated(w http.ResponseWriter, r *http.Request, data interface{}) {
-	WriteResponse(w, r, http.StatusCreated, Success(data))
+	WriteJSON(w, r, http.StatusCreated, data)
 }
 
+// Error responses with simple message
 func WriteError(w http.ResponseWriter, r *http.Request, statusCode int, message string) {
-	WriteResponse(w, r, statusCode, Error(message))
+	errorResponse := map[string]string{"error": message}
+	WriteJSON(w, r, statusCode, errorResponse)
 }
 
+// Validation error response (400) - special format for validation
 func WriteValidationError(w http.ResponseWriter, r *http.Request, errors []ValidationError) {
-	WriteResponse(w, r, http.StatusBadRequest, ValidationFailed(errors))
+	validationResponse := ValidationErrors{Errors: errors}
+	WriteJSON(w, r, http.StatusBadRequest, validationResponse)
 }
 
 // Most commonly used error responses
