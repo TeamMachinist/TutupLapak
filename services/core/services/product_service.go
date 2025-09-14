@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/teammachinist/tutuplapak/internal/database"
@@ -51,27 +52,39 @@ func NewProductService(
 func (s *ProductService) CreateProduct(ctx context.Context, req models.ProductRequest) (models.ProductResponse, error) {
 
 	_, err := s.productRepo.CheckSKUExistsByUser(ctx, req.SKU, req.UserID)
-	if err == nil {
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return models.ProductResponse{}, fmt.Errorf("failed to check SKU existence: %w", err)
+		}
+	} else {
 		return models.ProductResponse{}, errors.New("sku already exists")
 	}
 
-	productResp, err := s.productRepo.CreateProduct(ctx, req)
-	if err != nil {
-		return models.ProductResponse{}, err
-	}
-
 	if req.FileID != uuid.Nil {
-		file, err := s.fileClient.GetFileByID(ctx, req.FileID, req.UserID.String())
+		file, err := s.fileClient.GetFileByID(ctx, req.FileID)
 		if err != nil {
 			return models.ProductResponse{}, errors.New("fileId is not valid / exists")
 		}
 
-		if file.UserID != req.UserID.String() {
-			return models.ProductResponse{}, errors.New("fileId is not valid / exists")
-		}
+		log.Printf("[CreateProduct] File validated successfully: ID=%s, URI=%s", req.FileID, file.FileURI)
+	}
 
-		productResp.FileURI = file.FileURI
-		productResp.FileThumbnailURI = file.FileThumbnailURI
+	productResp, err := s.productRepo.CreateProduct(ctx, req)
+	if err != nil {
+		return models.ProductResponse{}, fmt.Errorf("failed to create product: %w", err)
+	}
+
+	log.Printf("[CreateProduct] Product created successfully with ID: %s", productResp.ProductID)
+
+	if req.FileID != uuid.Nil {
+		file, err := s.fileClient.GetFileByID(ctx, req.FileID)
+		if err != nil {
+			log.Printf("[CreateProduct] Failed to re-fetch file after creation: %v", err)
+		} else {
+			productResp.FileURI = file.FileURI
+			productResp.FileThumbnailURI = file.FileThumbnailURI
+			log.Printf("[CreateProduct] Attached file info to product response: URI=%s", file.FileURI)
+		}
 	}
 
 	return productResp, nil
@@ -100,7 +113,7 @@ func (s *ProductService) GetAllProducts(ctx context.Context, filter models.GetAl
 		}
 
 		if p.FileID != uuid.Nil {
-			file, err := s.fileClient.GetFileByID(ctx, p.FileID, p.UserID.String()) // ← p.UserID!
+			file, err := s.fileClient.GetFileByID(ctx, p.FileID) // ← p.UserID!
 			if err == nil {
 				resp.FileURI = file.FileURI
 				resp.FileThumbnailURI = file.FileThumbnailURI
@@ -146,7 +159,7 @@ func (s *ProductService) UpdateProduct(
 
 	// Validasi & ambil metadata file jika user ingin ubah file
 	if req.FileID != uuid.Nil {
-		file, err := s.fileClient.GetFileByID(ctx, req.FileID, userID.String())
+		file, err := s.fileClient.GetFileByID(ctx, req.FileID)
 		if err != nil {
 			return models.ProductResponse{}, errors.New("fileId is not valid / exists")
 		}
@@ -192,7 +205,7 @@ func (s *ProductService) UpdateProduct(
 		resp.FileThumbnailURI = fileMetadata.FileThumbnailURI
 	} else if updatedRow.FileID != uuid.Nil {
 		// Ambil metadata file lama (jika tidak diubah)
-		file, err := s.fileClient.GetFileByID(ctx, updatedRow.FileID, userID.String())
+		file, err := s.fileClient.GetFileByID(ctx, updatedRow.FileID)
 		if err == nil {
 
 			resp.FileURI = file.FileURI

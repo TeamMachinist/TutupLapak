@@ -40,7 +40,7 @@ func (s *PurchaseService) CreatePurchase(ctx context.Context, req models.Purchas
 
 	for i, item := range resp.PurchasedItems {
 		if item.FileID != uuid.Nil && s.fileClient != nil {
-			fileMeta, err := s.fileClient.GetFileByID(ctx, item.FileID, item.UserID.String())
+			fileMeta, err := s.fileClient.GetFileByID(ctx, item.FileID)
 			if err == nil {
 				resp.PurchasedItems[i].FileURI = fileMeta.FileURI
 				resp.PurchasedItems[i].FileThumbnailURI = fileMeta.FileThumbnailURI

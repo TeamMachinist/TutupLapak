@@ -58,7 +58,7 @@ func main() {
 	}
 	jwtService := internal.NewJWTService(jwtConfig)
 
-	fileClient := clients.NewFileClient(cfg.App.FileUrl, jwtService)
+	fileClient := clients.NewFileClient(cfg.App.FileUrl)
 
 	productRepo := repositories.NewProductRepository(database.Queries)
 	purchaseRepo := repositories.NewPurchaseRepository(database.Pool)
