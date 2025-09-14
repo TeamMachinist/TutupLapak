@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/teammachinist/tutuplapak/internal/database"
+	"github.com/teammachinist/tutuplapak/services/core/clients"
 	"github.com/teammachinist/tutuplapak/services/core/models"
 	"github.com/teammachinist/tutuplapak/services/core/repositories"
 
@@ -29,33 +31,24 @@ type ProductService struct {
 	productRepo repositories.ProductRepositoryInterface
 	// userRepo	repositories.UserRepositoryInterface
 	// authClient  clients.AuthClientInterface
-	// fileClient  clients.FileClientInterface
+	fileClient clients.FileClientInterface
 }
 
 func NewProductService(
 	productRepo repositories.ProductRepositoryInterface,
 	// userRepo repositories.UserRepositoryInterface,
 	// authClient clients.AuthClientInterface,
-	// fileClient clients.FileClientInterface,
+	fileClient clients.FileClientInterface,
 ) ProductServiceInterface {
 	return &ProductService{
 		productRepo: productRepo,
 		// userRepo:    userRepo,
 		// authClient:  authClient,
-		// fileClient:  fileClient,
+		fileClient: fileClient,
 	}
 }
 
 func (s *ProductService) CreateProduct(ctx context.Context, req models.ProductRequest) (models.ProductResponse, error) {
-	// user, err := s.userRepo.GetUserExist(ctx, req.UserID)
-	// if err != nil {
-	// 	return models.ProductResponse{}, errors.New("user not found or invalid token")
-	// }
-
-	// file, err := s.fileClient.GetFileByID(ctx, req.FileID)
-	// if err != nil {
-	// 	return models.ProductResponse{}, errors.New("file not found")
-	// }
 
 	_, err := s.productRepo.CheckSKUExistsByUser(ctx, req.SKU, req.UserID)
 	if err == nil {
@@ -67,8 +60,19 @@ func (s *ProductService) CreateProduct(ctx context.Context, req models.ProductRe
 		return models.ProductResponse{}, err
 	}
 
-	// productResp.FileURI = file.URI
-	// productResp.FileThumbnailURI = file.ThumbnailURI
+	if req.FileID != uuid.Nil {
+		file, err := s.fileClient.GetFileByID(ctx, req.FileID, req.UserID.String())
+		if err != nil {
+			return models.ProductResponse{}, errors.New("fileId is not valid / exists")
+		}
+
+		if file.UserID != req.UserID.String() {
+			return models.ProductResponse{}, errors.New("fileId is not valid / exists")
+		}
+
+		productResp.FileURI = file.FileURI
+		productResp.FileThumbnailURI = file.FileThumbnailURI
+	}
 
 	return productResp, nil
 }
@@ -95,15 +99,13 @@ func (s *ProductService) GetAllProducts(ctx context.Context, filter models.GetAl
 			// FileURI & FileThumbnailURI akan diisi di bawah
 		}
 
-		// // Ambil file metadata jika FileID valid
-		// if p.FileID != uuid.Nil {
-		// 	file, err := s.fileClient.GetFileByID(ctx, p.FileID)
-		// 	if err == nil {
-		// 		resp.FileURI = file.URI
-		// 		resp.FileThumbnailURI = file.ThumbnailURI
-		// 	}
-		// 	// Jika error, biarkan kosong — sesuai permintaan "ignore if invalid"
-		// }
+		if p.FileID != uuid.Nil {
+			file, err := s.fileClient.GetFileByID(ctx, p.FileID, p.UserID.String()) // ← p.UserID!
+			if err == nil {
+				resp.FileURI = file.FileURI
+				resp.FileThumbnailURI = file.FileThumbnailURI
+			}
+		}
 
 		responses = append(responses, resp)
 	}
@@ -118,31 +120,42 @@ func (s *ProductService) UpdateProduct(
 	userID uuid.UUID,
 ) (models.ProductResponse, error) {
 
-	// owned, err := s.productRepo.CheckProductOwnership(ctx, productID, userID)
-	// if err != nil {
-	// 	return models.ProductResponse{}, err
-	// }
-	// if !owned {
-	// 	return models.ProductResponse{}, errors.New("unauthorized: you don't own this product")
-	// }
-
-	// ??? is this neccesaryy?
-	existingProductID, err := s.productRepo.CheckSKUExistsByUser(ctx, req.SKU, userID)
-	if err == nil {
-		if existingProductID != productID {
-			return models.ProductResponse{}, errors.New("sku already exists")
-		}
-	} else if !errors.Is(err, sql.ErrNoRows) {
-		return models.ProductResponse{}, err
+	owned, err := s.productRepo.CheckProductOwnership(ctx, productID, userID)
+	if err != nil {
+		// fmt.Printf("Error checking ownership: %v\n", err)
+		return models.ProductResponse{}, fmt.Errorf("internal error verifying ownership")
 	}
 
-	// // 3. Validasi fileId jika tidak zero
-	// if req.FileID != uuid.Nil {
-	// 	_, err := s.fileClient.GetFileByID(ctx, req.FileID)
-	// 	if err != nil {
-	// 		return models.ProductResponse{}, errors.New("file not found or invalid")
-	// 	}
-	// }
+	if !owned {
+		fmt.Println("User does not own this product")
+		return models.ProductResponse{}, errors.New("unauthorized: you don't own this product")
+	}
+	fmt.Println("error disini")
+	existingProduct, err := s.productRepo.CheckSKUExistsByUser(ctx, req.SKU, userID)
+
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return models.ProductResponse{}, err
+		}
+	} else {
+		if existingProduct.ID != productID {
+			return models.ProductResponse{}, errors.New("sku already exists for this user")
+		}
+	}
+	var fileMetadata *clients.FileMetadataResponse
+
+	// Validasi & ambil metadata file jika user ingin ubah file
+	if req.FileID != uuid.Nil {
+		file, err := s.fileClient.GetFileByID(ctx, req.FileID, userID.String())
+		if err != nil {
+			return models.ProductResponse{}, errors.New("fileId is not valid / exists")
+		}
+		if file.UserID != userID.String() {
+			return models.ProductResponse{}, errors.New("fileId is not valid / exists")
+		}
+
+		fileMetadata = file
+	}
 
 	updatedRow, err := s.productRepo.UpdateProduct(ctx, database.UpdateProductParams{
 		ID:        productID,
@@ -173,29 +186,36 @@ func (s *ProductService) UpdateProduct(
 		FileThumbnailURI: "",
 	}
 
-	// // 6. Ambil metadata file jika ada
-	// if updatedRow.FileID != uuid.Nil {
-	// 	file, err := s.fileClient.GetFileByID(ctx, updatedRow.FileID)
-	// 	if err == nil {
-	// 		resp.FileURI = file.URI
-	// 		resp.FileThumbnailURI = file.ThumbnailURI
-	// 	}
-	// 	// Jika error, biarkan string kosong — tidak return error
-	// }
+	// Gunakan metadata yang sudah diambil, atau ambil baru jika diperlukan
+	if fileMetadata != nil {
+		resp.FileURI = fileMetadata.FileURI
+		resp.FileThumbnailURI = fileMetadata.FileThumbnailURI
+	} else if updatedRow.FileID != uuid.Nil {
+		// Ambil metadata file lama (jika tidak diubah)
+		file, err := s.fileClient.GetFileByID(ctx, updatedRow.FileID, userID.String())
+		if err == nil {
+
+			resp.FileURI = file.FileURI
+			resp.FileThumbnailURI = file.FileThumbnailURI
+		}
+	}
 
 	return resp, nil
 }
 
 func (s *ProductService) DeleteProduct(ctx context.Context, productID uuid.UUID, userID uuid.UUID) error {
-	// owned, err := s.productRepo.CheckProductOwnership(ctx, productID, userID)
-	// if err != nil {
-	// 	return err
-	// }
-	// if !owned {
-	// 	return errors.New("unauthorized: you don't own this product")
-	// }
+	owned, err := s.productRepo.CheckProductOwnership(ctx, productID, userID)
+	if err != nil {
+		// fmt.Printf("Error checking ownership: %v\n", err)
+		return fmt.Errorf("internal error verifying ownership")
+	}
 
-	err := s.productRepo.DeleteProduct(ctx, productID, userID)
+	if !owned {
+		fmt.Println("User does not own this product")
+		return errors.New("unauthorized: you don't own this product")
+	}
+
+	err = s.productRepo.DeleteProduct(ctx, productID, userID)
 	if err != nil {
 		return err
 	}

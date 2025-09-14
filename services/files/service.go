@@ -1,111 +1,288 @@
 package main
 
 import (
-	"bytes"
 	"context"
+	"database/sql"
 	"fmt"
-	"image"
-	"image/jpeg"
-	"image/png"
-	"mime/multipart"
-	"strings"
 
 	"github.com/google/uuid"
+	"github.com/teammachinist/tutuplapak/internal/cache"
 	"github.com/teammachinist/tutuplapak/internal/database"
-
-	// "github.com/h2non/bimg"
-	"github.com/nfnt/resize"
+	"github.com/teammachinist/tutuplapak/internal/logger"
 )
 
-type FileStorage interface {
-	Upload(ctx context.Context, objectKey, contentType string, file multipart.File, size int64) (string, error)
-	CompressImage(buffer []byte, quality int, dirname string) ([]byte, int64, error)
-}
-
 type FileService struct {
-	db *database.Queries
-	// userRepo FileRepository
-	// storage FileStorage
+	queries *database.Queries
+	cache   *cache.RedisCache
 }
 
-func NewFileService(db *database.Queries) FileService {
-	return FileService{db: db}
+func NewFileService(queries *database.Queries, cache *cache.RedisCache) FileService {
+	return FileService{
+		queries: queries,
+		cache:   cache,
+	}
 }
 
-func (s *FileService) CreateFiles(ctx context.Context, file File) (database.Files, error) {
-	newFile, err := s.db.CreateFile(ctx, database.CreateFileParams{
+func (s FileService) CreateFiles(ctx context.Context, file File) (File, error) {
+	logger.InfoCtx(ctx, "Creating file record", "file_id", file.ID, "user_id", file.UserID)
+
+	// Create file record in database
+	params := database.CreateFileParams{
 		ID:               file.ID,
 		UserID:           file.UserID,
 		FileUri:          file.FileURI,
 		FileThumbnailUri: file.FileThumbnailURI,
-	})
-	if err != nil {
-		return database.Files{}, err
 	}
-	return newFile, nil
+
+	dbFile, err := s.queries.CreateFile(ctx, params)
+	if err != nil {
+		logger.ErrorCtx(ctx, "Failed to create file in database",
+			"error", err,
+			"file_id", file.ID,
+			"user_id", file.UserID,
+		)
+		return File{}, fmt.Errorf("failed to create file: %w", err)
+	}
+
+	// Convert database file to our File model
+	createdFile := File{
+		ID:               dbFile.ID,
+		UserID:           dbFile.UserID,
+		FileURI:          dbFile.FileUri,
+		FileThumbnailURI: dbFile.FileThumbnailUri,
+		CreatedAt:        dbFile.CreatedAt,
+	}
+
+	// Cache the file metadata
+	cacheKey := fmt.Sprintf(cache.FileMetadataKey, file.ID.String())
+	if err := s.cache.Set(ctx, cacheKey, createdFile, cache.FileMetadataTTL); err != nil {
+		logger.WarnCtx(ctx, "Failed to cache file metadata after creation",
+			"error", err,
+			"file_id", file.ID,
+			"cache_key", cacheKey,
+		)
+		// Don't fail the operation for cache errors
+	}
+
+	// Invalidate user's file list cache
+	userCacheKey := fmt.Sprintf(cache.UserFileListKey, file.UserID.String())
+	if err := s.cache.Delete(ctx, userCacheKey); err != nil {
+		logger.WarnCtx(ctx, "Failed to invalidate user file list cache",
+			"error", err,
+			"user_id", file.UserID,
+			"cache_key", userCacheKey,
+		)
+	}
+
+	// Update file exists cache
+	existsCacheKey := fmt.Sprintf(cache.FileExistsKey, file.ID.String())
+	if err := s.cache.Set(ctx, existsCacheKey, true, cache.FileExistsTTL); err != nil {
+		logger.WarnCtx(ctx, "Failed to cache file existence",
+			"error", err,
+			"file_id", file.ID,
+			"cache_key", existsCacheKey,
+		)
+	}
+
+	logger.InfoCtx(ctx, "File record created successfully",
+		"file_id", createdFile.ID,
+		"user_id", createdFile.UserID,
+	)
+
+	return createdFile, nil
 }
 
-func (s *FileService) DeleteFiles(ctx context.Context, fileId uuid.UUID) error {
-	file, _ := s.GetFile(ctx, fileId)
-	if file == (database.Files{}) {
-		return fmt.Errorf("file doesn't exist")
+func (s FileService) GetFile(ctx context.Context, fileID uuid.UUID) (File, error) {
+	logger.DebugCtx(ctx, "Getting file", "file_id", fileID)
+
+	// Try cache first
+	cacheKey := fmt.Sprintf(cache.FileMetadataKey, fileID.String())
+	var cachedFile File
+
+	if err := s.cache.Get(ctx, cacheKey, &cachedFile); err == nil {
+		logger.DebugCtx(ctx, "File retrieved from cache", "file_id", fileID)
+		return cachedFile, nil
 	}
 
-	err := s.db.DeleteFile(ctx, fileId)
-	if err != nil {
-		return err
-	}
-	return nil
-}
+	// Cache miss - get from database
+	logger.DebugCtx(ctx, "File cache miss - querying database", "file_id", fileID)
 
-func (s *FileService) GetFile(ctx context.Context, fileId uuid.UUID) (database.Files, error) {
-	file, err := s.db.GetFile(ctx, fileId)
+	dbFile, err := s.queries.GetFile(ctx, fileID)
 	if err != nil {
-		return database.Files{}, err
+		if err == sql.ErrNoRows {
+			logger.WarnCtx(ctx, "File not found", "file_id", fileID)
+			return File{}, fmt.Errorf("file not found")
+		}
+		logger.ErrorCtx(ctx, "Failed to get file from database", "error", err, "file_id", fileID)
+		return File{}, fmt.Errorf("failed to get file: %w", err)
 	}
+
+	// Convert database file to our File model
+	file := File{
+		ID:               dbFile.ID,
+		UserID:           dbFile.UserID,
+		FileURI:          dbFile.FileUri,
+		FileThumbnailURI: dbFile.FileThumbnailUri,
+		CreatedAt:        dbFile.CreatedAt,
+	}
+
+	// Cache the file metadata
+	if err := s.cache.Set(ctx, cacheKey, file, cache.FileMetadataTTL); err != nil {
+		logger.WarnCtx(ctx, "Failed to cache file metadata",
+			"error", err,
+			"file_id", fileID,
+			"cache_key", cacheKey,
+		)
+	}
+
+	logger.InfoCtx(ctx, "File retrieved from database", "file_id", fileID)
 	return file, nil
 }
 
-// Original bimg implementation (commented for Docker compatibility)
-// func CompressImage(buffer []byte, quality int, dirname string) ([]byte, int64, error) {
-// 	converted, err := bimg.NewImage(buffer).Convert(bimg.JPEG) // convert image to JPEG
-// 	if err != nil {
-// 		return nil, 0, err
-// 	}
-// 	//compress the image
-// 	processed, err := bimg.NewImage(converted).Process(bimg.Options{Quality: quality, StripMetadata: true})
-// 	if err != nil {
-// 		return nil, 0, err
-// 	}
+func (s FileService) DeleteFiles(ctx context.Context, fileID uuid.UUID, userID string) error {
+	logger.InfoCtx(ctx, "Deleting file", "file_id", fileID, "user_id", userID)
 
-// 	return processed, int64(len(processed)), nil
-// }
-
-// NFNT implementation
-func CompressImage(buffer []byte, quality int, dirname string) ([]byte, int64, error) {
-	// Decode image from buffer (similar to bimg.NewImage)
-	img, format, err := image.Decode(bytes.NewReader(buffer))
+	// First, verify the file exists and belongs to the user
+	file, err := s.GetFile(ctx, fileID)
 	if err != nil {
-		return nil, 0, err
+		return err // This will return "file not found" if file doesn't exist
 	}
 
-	// Resize image for compression (similar to bimg.Process with quality)
-	// Using 800x600 max to reduce file size like quality compression
-	resized := resize.Thumbnail(800, 600, img, resize.Lanczos3)
+	// Check ownership
+	if file.UserID.String() != userID {
+		logger.WarnCtx(ctx, "Unauthorized file deletion attempt",
+			"file_id", fileID,
+			"requesting_user", userID,
+			"file_owner", file.UserID.String(),
+		)
+		return fmt.Errorf("unauthorized")
+	}
 
-	// Convert to JPEG (similar to bimg.Convert(bimg.JPEG))
-	var processed bytes.Buffer
-	err = jpeg.Encode(&processed, resized, &jpeg.Options{Quality: quality})
+	// Delete from database
+	err = s.queries.DeleteFile(ctx, fileID)
 	if err != nil {
-		// Fallback to original format if JPEG fails
-		if strings.ToLower(format) == "png" {
-			processed.Reset()
-			err = png.Encode(&processed, resized)
-		}
+		logger.ErrorCtx(ctx, "Failed to delete file from database",
+			"error", err,
+			"file_id", fileID,
+		)
+		return fmt.Errorf("failed to delete file: %w", err)
+	}
+
+	// Remove from caches
+	cacheKey := fmt.Sprintf(cache.FileMetadataKey, fileID.String())
+	if err := s.cache.Delete(ctx, cacheKey); err != nil {
+		logger.WarnCtx(ctx, "Failed to remove file from cache",
+			"error", err,
+			"file_id", fileID,
+			"cache_key", cacheKey,
+		)
+	}
+
+	// Remove from exists cache
+	existsCacheKey := fmt.Sprintf(cache.FileExistsKey, fileID.String())
+	if err := s.cache.Delete(ctx, existsCacheKey); err != nil {
+		logger.WarnCtx(ctx, "Failed to remove file existence from cache",
+			"error", err,
+			"file_id", fileID,
+			"cache_key", existsCacheKey,
+		)
+	}
+
+	// Invalidate user's file list cache
+	userCacheKey := fmt.Sprintf(cache.UserFileListKey, userID)
+	if err := s.cache.Delete(ctx, userCacheKey); err != nil {
+		logger.WarnCtx(ctx, "Failed to invalidate user file list cache",
+			"error", err,
+			"user_id", userID,
+			"cache_key", userCacheKey,
+		)
+	}
+
+	logger.InfoCtx(ctx, "File deleted successfully", "file_id", fileID, "user_id", userID)
+	return nil
+}
+
+// GetUserFiles retrieves all files for a specific user (with caching)
+func (s FileService) GetUserFiles(ctx context.Context, userID string) ([]File, error) {
+	logger.DebugCtx(ctx, "Getting user files", "user_id", userID)
+
+	cacheKey := fmt.Sprintf(cache.UserFileListKey, userID)
+	var files []File
+
+	err := s.cache.GetOrSet(ctx, cacheKey, &files, cache.FileListTTL, func() (interface{}, error) {
+		logger.DebugCtx(ctx, "User files cache miss - querying database", "user_id", userID)
+
+		userUUID, err := uuid.Parse(userID)
 		if err != nil {
-			return nil, 0, err
+			return nil, fmt.Errorf("invalid user ID: %w", err)
 		}
+
+		dbFiles, err := s.queries.GetFilesByUser(ctx, userUUID)
+		if err != nil {
+			logger.ErrorCtx(ctx, "Failed to get user files from database", "error", err, "user_id", userID)
+			return nil, fmt.Errorf("failed to get user files: %w", err)
+		}
+
+		// Convert database files to our File model
+		fileList := make([]File, len(dbFiles))
+		for i, dbFile := range dbFiles {
+			fileList[i] = File{
+				ID:               dbFile.ID,
+				UserID:           dbFile.UserID,
+				FileURI:          dbFile.FileUri,
+				FileThumbnailURI: dbFile.FileThumbnailUri,
+				CreatedAt:        dbFile.CreatedAt,
+			}
+		}
+
+		return fileList, nil
+	})
+
+	if err != nil {
+		return nil, err
 	}
 
-	return processed.Bytes(), int64(processed.Len()), nil
+	logger.InfoCtx(ctx, "User files retrieved successfully", "user_id", userID, "count", len(files))
+	return files, nil
+}
+
+// FileExists checks if a file exists (with caching)
+func (s FileService) FileExists(ctx context.Context, fileID uuid.UUID) (bool, error) {
+	logger.DebugCtx(ctx, "Checking file existence", "file_id", fileID)
+
+	// Try cache first
+	cacheKey := fmt.Sprintf(cache.FileExistsKey, fileID.String())
+	var exists bool
+
+	if err := s.cache.Get(ctx, cacheKey, &exists); err == nil {
+		logger.DebugCtx(ctx, "File existence retrieved from cache", "file_id", fileID, "exists", exists)
+		return exists, nil
+	}
+
+	// Cache miss - check database
+	logger.DebugCtx(ctx, "File existence cache miss - querying database", "file_id", fileID)
+
+	_, err := s.queries.GetFile(ctx, fileID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			exists = false
+		} else {
+			logger.ErrorCtx(ctx, "Failed to check file existence", "error", err, "file_id", fileID)
+			return false, fmt.Errorf("failed to check file existence: %w", err)
+		}
+	} else {
+		exists = true
+	}
+
+	// Cache the existence result
+	if err := s.cache.Set(ctx, cacheKey, exists, cache.FileExistsTTL); err != nil {
+		logger.WarnCtx(ctx, "Failed to cache file existence",
+			"error", err,
+			"file_id", fileID,
+			"cache_key", cacheKey,
+		)
+	}
+
+	logger.DebugCtx(ctx, "File existence checked", "file_id", fileID, "exists", exists)
+	return exists, nil
 }

@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/teammachinist/tutuplapak/internal"
+	"github.com/teammachinist/tutuplapak/services/core/clients"
 	"github.com/teammachinist/tutuplapak/services/core/config"
 	"github.com/teammachinist/tutuplapak/services/core/handlers"
 	"github.com/teammachinist/tutuplapak/services/core/repositories"
@@ -31,8 +32,13 @@ func main() {
 	}
 	defer database.Close()
 
+	var enablePrefork bool
+	if cfg.App.Env == "production" {
+		enablePrefork = true
+	}
+
 	app := fiber.New(fiber.Config{
-		Prefork: true,
+		Prefork: enablePrefork,
 		AppName: "Core Service v1.0",
 	})
 
@@ -45,32 +51,47 @@ func main() {
 		})
 	})
 
-	productRepo := repositories.NewProductRepository(database.Queries)
+	jwtConfig := &internal.JWTConfig{
+		Key:      cfg.JWT.Secret,
+		Duration: cfg.JWT.Duration,
+		Issuer:   cfg.JWT.Issuer,
+	}
+	jwtService := internal.NewJWTService(jwtConfig)
 
-	productService := services.NewProductService(productRepo)
+	fileClient := clients.NewFileClient(cfg.App.FileUrl, jwtService)
+
+	productRepo := repositories.NewProductRepository(database.Queries)
+	purchaseRepo := repositories.NewPurchaseRepository(database.Pool)
+	userRepo := repositories.NewUserRepository(database.Queries)
+
+	productService := services.NewProductService(productRepo, fileClient)
+	purchaseService := services.NewPurchaseService(purchaseRepo, fileClient)
+	userService := services.NewUserService(userRepo, fileClient)
 
 	productHandler := handlers.NewProductHandler(productService)
+	purchaseHandler := handlers.NewPurchaseHandler(purchaseService)
+	userHandler := handlers.NewUserHandler(userService)
 
 	api := app.Group("/api/v1")
 
 	products := api.Group("/products")
 	{
 		products.Get("", productHandler.GetAllProducts)
-		products.Post("", productHandler.CreateProduct)
-		products.Put("/:productId", productHandler.UpdateProduct)
-		products.Delete("/:productId", productHandler.DeleteProduct)
+		products.Post("", jwtService.FiberMiddleware(), productHandler.CreateProduct)
+		products.Put("/:productId", jwtService.FiberMiddleware(), productHandler.UpdateProduct)
+		products.Delete("/:productId", jwtService.FiberMiddleware(), productHandler.DeleteProduct)
+
 	}
-
-	userRepo := repositories.NewUserRepository(database.Queries)
-
-	userService := services.NewUserService(userRepo)
-
-	userHandler := handlers.NewUserHandler(userService)
-
+	
+	// User management endpoints (auth-protected)
 	user := api.Group("/user")
 	{
-		user.Get("", userHandler.GetUserWithFileId)
-		user.Put("", userHandler.UpdateUser)
+		user.Post("/link/phone", jwtService.FiberMiddleware(), userHandler.LinkPhone)
+	}
+
+	purchase := api.Group("/purchase")
+	{
+		purchase.Post("", purchaseHandler.CreatePurchase)
 	}
 
 	c := make(chan os.Signal, 1)

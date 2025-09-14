@@ -27,7 +27,7 @@ type ProductRequest struct {
 	Qty      int       `json:"qty" validate:"required,min=1"`
 	Price    int       `json:"price" validate:"required,min=100"`
 	SKU      string    `json:"sku" validate:"required,max=32"`
-	FileID   uuid.UUID `json:"fileId" `
+	FileID   uuid.UUID `json:"fileId" validate:"required" `
 	UserID   uuid.UUID `json:"userId" `
 }
 
@@ -43,6 +43,8 @@ type ProductResponse struct {
 	FileThumbnailURI string    `json:"fileThumbnailUri"`
 	CreatedAt        time.Time `json:"createdAt"`
 	UpdatedAt        time.Time `json:"updatedAt"`
+
+	UserID uuid.UUID `json:"-"` // ← ini tidak akan muncul di response!
 }
 
 type GetAllProductsParams struct {

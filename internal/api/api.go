@@ -1,19 +1,15 @@
 package api
 
 import (
+	"encoding/json"
+	"net/http"
 	"regexp"
 	"strings"
+
+	"github.com/teammachinist/tutuplapak/internal/logger"
 )
 
-// Standard API response format
-type Response struct {
-	Status  string      `json:"status"`
-	Data    interface{} `json:"data,omitempty"`
-	Error   string      `json:"error,omitempty"`
-	Message string      `json:"message,omitempty"`
-}
-
-// Validation errors
+// Validation errors (only for validation failed responses)
 type ValidationError struct {
 	Field   string `json:"field"`
 	Message string `json:"message"`
@@ -23,21 +19,54 @@ type ValidationErrors struct {
 	Errors []ValidationError `json:"errors"`
 }
 
-// Response constructors
-func Success(data interface{}) Response {
-	return Response{Status: "success", Data: data}
-}
+// HTTP response writers - return data directly as per spec
+func WriteJSON(w http.ResponseWriter, r *http.Request, statusCode int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
 
-func Error(message string) Response {
-	return Response{Status: "error", Error: message}
-}
-
-func ValidationFailed(errors []ValidationError) Response {
-	return Response{
-		Status: "error",
-		Error:  "validation failed",
-		Data:   ValidationErrors{Errors: errors},
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		logger.ErrorCtx(r.Context(), "Failed to encode JSON response", "error", err, "status_code", statusCode)
+		// Fallback to basic error response
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
+}
+
+// Success responses (200, 201) - return data directly
+func WriteSuccess(w http.ResponseWriter, r *http.Request, data interface{}) {
+	WriteJSON(w, r, http.StatusOK, data)
+}
+
+func WriteCreated(w http.ResponseWriter, r *http.Request, data interface{}) {
+	WriteJSON(w, r, http.StatusCreated, data)
+}
+
+// Error responses with simple message
+func WriteError(w http.ResponseWriter, r *http.Request, statusCode int, message string) {
+	errorResponse := map[string]string{"error": message}
+	WriteJSON(w, r, statusCode, errorResponse)
+}
+
+// Validation error response (400) - special format for validation
+func WriteValidationError(w http.ResponseWriter, r *http.Request, errors []ValidationError) {
+	validationResponse := ValidationErrors{Errors: errors}
+	WriteJSON(w, r, http.StatusBadRequest, validationResponse)
+}
+
+// Most commonly used error responses
+func WriteBadRequest(w http.ResponseWriter, r *http.Request, message string) {
+	WriteError(w, r, http.StatusBadRequest, message)
+}
+
+func WriteNotFound(w http.ResponseWriter, r *http.Request, message string) {
+	WriteError(w, r, http.StatusNotFound, message)
+}
+
+func WriteUnauthorized(w http.ResponseWriter, r *http.Request, message string) {
+	WriteError(w, r, http.StatusUnauthorized, message)
+}
+
+func WriteInternalServerError(w http.ResponseWriter, r *http.Request, message string) {
+	WriteError(w, r, http.StatusInternalServerError, message)
 }
 
 // Common validation functions

@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/teammachinist/tutuplapak/internal/cache"
 )
 
 type HealthCheck struct {
@@ -17,10 +18,10 @@ type HealthCheck struct {
 
 type HealthHandler struct {
 	db    *pgxpool.Pool
-	cache *CacheService
+	cache *cache.RedisCache
 }
 
-func NewHealthHandler(db *pgxpool.Pool, cache *CacheService) *HealthHandler {
+func NewHealthHandler(db *pgxpool.Pool, cache *cache.RedisCache) *HealthHandler {
 	return &HealthHandler{
 		db:    db,
 		cache: cache,
@@ -95,5 +96,5 @@ func (h *HealthHandler) checkCache(ctx context.Context) error {
 	if h.cache == nil {
 		return nil
 	}
-	return h.cache.client.Ping(ctx).Err()
+	return h.cache.Ping(ctx)
 }

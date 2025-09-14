@@ -4,10 +4,11 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/teammachinist/tutuplapak/internal"
+	"github.com/teammachinist/tutuplapak/internal/cache"
+	"github.com/teammachinist/tutuplapak/internal/logger"
 
 	"github.com/caarlos0/env/v8"
 	"github.com/gin-gonic/gin"
@@ -24,27 +25,27 @@ type Config struct {
 	JWTIssuer   string        `env:"JWT_ISSUER" envDefault:"fitbyte-app"`
 
 	// Redis Configuration
-	RedisAddr     string `env:"REDIS_ADDR" envDefault:"redis:6379"`
+	RedisAddr     string `env:"REDIS_ADDR" envDefault:"redis:6378"`
 	RedisPassword string `env:"REDIS_PASSWORD" envDefault:""`
 	RedisDB       int    `env:"REDIS_DB" envDefault:"0"`
 }
 
 func main() {
+	// Initialize logger
+	logger.Init()
+	logger.Info("Starting Auth service")
+
 	// Load config
 	cfg := Config{}
 	if err := env.Parse(&cfg); err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	redisURL := os.Getenv("REDIS_URL")
-	if redisURL == "" {
-		redisURL = "redis://localhost:6379"
-	}
-
 	// Initialize database
 	ctx := context.Background()
 	db, err := internal.NewDatabase(ctx, cfg.DatabaseURL)
 	if err != nil {
+		log.Printf("Database connection failed: %v", err)
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
@@ -57,17 +58,32 @@ func main() {
 	}
 	jwtService := internal.NewJWTService(jwtConfig)
 
-	// Initialize cache
-	cache := NewCacheService(redisURL)
-	defer cache.Close()
+	// Initialize Redis cache
+	redisConfig := cache.CacheConfig{
+		Addr:     cfg.RedisAddr,
+		Password: cfg.RedisPassword,
+		DB:       cfg.RedisDB,
+	}
+	redisCache := cache.NewRedisCache(redisConfig)
+	defer func() {
+		if err := redisCache.Close(); err != nil {
+			log.Printf("Failed to close Redis connection: %v", err)
+		}
+	}()
+
+	// Test Redis connection (non-blocking)
+	if err := redisCache.Ping(ctx); err != nil {
+		log.Printf("Redis connection failed - running without cache: %v", err)
+	}
 
 	// Initialize layers
 	userRepo := NewUserRepository(db.Queries)
 	userService := NewUserService(userRepo, *jwtService, db.Queries)
 	userHandler := NewUserHandler(userService)
-	healthHandler := NewHealthHandler(db.Pool, cache)
+	healthHandler := NewHealthHandler(db.Pool, redisCache)
 
 	router := gin.Default()
+	router.SetTrustedProxies(nil)
 
 	// Health check endpoints
 	router.GET("/healthz", healthHandler.HealthCheck)

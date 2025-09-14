@@ -16,8 +16,9 @@ type Config struct {
 
 type AppConfig struct {
 	Port       string
-	Env        string
 	APITimeout time.Duration
+	FileUrl    string
+	Env        string
 }
 
 type DatabaseConfig struct {
@@ -31,7 +32,9 @@ type DatabaseConfig struct {
 }
 
 type JWTConfig struct {
-	Secret string
+	Secret   string        `json:"secret"`
+	Duration time.Duration `json:"duration"`
+	Issuer   string        `json:"issuer"`
 }
 
 func Load() (*Config, error) {
@@ -39,9 +42,17 @@ func Load() (*Config, error) {
 		fmt.Println("No .env file found, using environment variables")
 	}
 
+	jwtDurationStr := getEnv("JWT_DURATION", "24h")
+	jwtDuration, _ := time.ParseDuration(jwtDurationStr)
+	if jwtDuration == 0 {
+		jwtDuration = 24 * time.Hour
+	}
+
 	config := &Config{
 		App: AppConfig{
-			Port: getEnv("PORT", "8002"),
+			Port:    getEnv("PORT", "8002"),
+			FileUrl: getEnv("FILES_SERVICE_URL", "http://localhost:8003"),
+			Env:     getEnv("ENV", "development"),
 		},
 		Database: DatabaseConfig{
 			Host:        getEnv("DB_HOST", "localhost"),
@@ -51,6 +62,11 @@ func Load() (*Config, error) {
 			DBName:      getEnv("DB_NAME", "myapp"),
 			SSLMode:     getEnv("DB_SSL_MODE", "disable"),
 			DatabaseURL: getEnv("DATABASE_URL", ""),
+		},
+		JWT: JWTConfig{
+			Secret:   getEnv("JWT_SECRET", "your-super-secret-key-change-in-production"),
+			Duration: jwtDuration,
+			Issuer:   getEnv("JWT_ISSUER", "tutuplapak-core-service"),
 		},
 	}
 
