@@ -15,11 +15,12 @@ services:
   # Auth Service
   auth-service:
     build:
-      context: ../services/auth
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: services/auth/Dockerfile
     expose:
       - "${AUTH_PORT}"
     environment:
+      - ENV=production
       - PORT=${AUTH_PORT}
       - DATABASE_URL=${DATABASE_URL}
     depends_on:
@@ -29,11 +30,12 @@ services:
   # Core Service
   core-service:
     build:
-      context: ../services/core
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: services/core/Dockerfile
     expose:
       - "${CORE_PORT}"
     environment:
+      - ENV=production
       - PORT=${CORE_PORT}
       - DATABASE_URL=${DATABASE_URL}
       - AUTH_SERVICE_URL=${AUTH_SERVICE_URL}
@@ -45,17 +47,43 @@ services:
   # Files Service
   files-service:
     build:
-      context: ../services/files
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: services/files/Dockerfile
     expose:
       - "${FILES_PORT}"
     environment:
+      - ENV=production
       - PORT=${FILES_PORT}
       - DATABASE_URL=${DATABASE_URL}
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT}
+      - MINIO_PUBLIC_ENDPOINT=${MINIO_PUBLIC_ENDPOINT}
+      - MINIO_BUCKET=${MINIO_BUCKET}
+      - MINIO_USE_SSL=${MINIO_USE_SSL}
+
     depends_on:
       - main-db
     restart: unless-stopped
-
+  minio:
+    image: minio/minio:latest
+    container_name: tutuplapak-minio
+    env_file: .env
+    ports:
+      - "${MINIO_PORT}:9000"
+      - "${MINIO_CONSOLE_PORT}:9001" # Remove console port for production
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    # command: server /data # Remove --console-address flag for production
+    # networks:
+    #   - tutuplapak-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
   # Main Database
   main-db:
     image: postgres:15-alpine
@@ -75,6 +103,7 @@ services:
 
 volumes:
   main_data:
+    driver: local
 
 networks:
   default:

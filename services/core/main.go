@@ -1,25 +1,109 @@
 package main
 
 import (
+	"context"
 	"log"
-	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+
+	"github.com/teammachinist/tutuplapak/internal"
+	"github.com/teammachinist/tutuplapak/services/core/clients"
+	"github.com/teammachinist/tutuplapak/services/core/config"
+	"github.com/teammachinist/tutuplapak/services/core/handlers"
+	"github.com/teammachinist/tutuplapak/services/core/repositories"
+	"github.com/teammachinist/tutuplapak/services/core/services"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/logger"
 )
 
-func healthHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status":"healthy","service":"core"}`))
-}
-
 func main() {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8002"
+	ctx := context.Background()
+
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal("Failed to load config:", err)
 	}
 
-	http.HandleFunc("/healthz", healthHandler)
+	database, err := internal.NewDatabase(ctx, cfg.Database.DatabaseURL)
+	if err != nil {
+		log.Fatal("Failed to connect to database:", err)
+	}
+	defer database.Close()
 
-	log.Printf("Core service starting on port %s", port)
-	log.Fatal(http.ListenAndServe(":"+port, nil))
+	var enablePrefork bool
+	if cfg.App.Env == "production" {
+		enablePrefork = true
+	}
+
+	app := fiber.New(fiber.Config{
+		Prefork: enablePrefork,
+		AppName: "Core Service v1.0",
+	})
+
+	app.Use(logger.New())
+
+	app.Get("/healthz", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{
+			"status":  "healthy",
+			"service": "core",
+		})
+	})
+
+	jwtConfig := &internal.JWTConfig{
+		Key:      cfg.JWT.Secret,
+		Duration: cfg.JWT.Duration,
+		Issuer:   cfg.JWT.Issuer,
+	}
+	jwtService := internal.NewJWTService(jwtConfig)
+
+	fileClient := clients.NewFileClient(cfg.App.FileUrl, jwtService)
+
+	productRepo := repositories.NewProductRepository(database.Queries)
+	purchaseRepo := repositories.NewPurchaseRepository(database.Pool)
+	userRepo := repositories.NewUserRepository(database.Queries)
+
+	productService := services.NewProductService(productRepo, fileClient)
+	purchaseService := services.NewPurchaseService(purchaseRepo, fileClient)
+	userService := services.NewUserService(userRepo, fileClient)
+
+	productHandler := handlers.NewProductHandler(productService)
+	purchaseHandler := handlers.NewPurchaseHandler(purchaseService)
+	userHandler := handlers.NewUserHandler(userService)
+
+	api := app.Group("/api/v1")
+
+	products := api.Group("/products")
+	{
+		products.Get("", productHandler.GetAllProducts)
+		products.Post("", jwtService.FiberMiddleware(), productHandler.CreateProduct)
+		products.Put("/:productId", jwtService.FiberMiddleware(), productHandler.UpdateProduct)
+		products.Delete("/:productId", jwtService.FiberMiddleware(), productHandler.DeleteProduct)
+	}
+
+	// User management endpoints (auth-protected)
+	user := api.Group("/user")
+	{
+		user.Post("/link/phone", jwtService.FiberMiddleware(), userHandler.LinkPhone)
+	}
+
+	purchase := api.Group("/purchase")
+	{
+		purchase.Post("", purchaseHandler.CreatePurchase)
+	}
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		<-c
+		log.Println("Gracefully shutting down...")
+		app.Shutdown()
+	}()
+
+	log.Printf("Core service starting on port %s", cfg.App.Port)
+	if err := app.Listen(":" + cfg.App.Port); err != nil {
+		log.Fatal("Server failed to start:", err)
+	}
 }

@@ -21,8 +21,8 @@ profile.cov
 # vendor/
 
 # Go workspace file
-# go.work
-# go.work.sum
+go.work
+go.work.sum
 
 # Air build artifacts
 tmp/
@@ -40,3 +40,6 @@ tmp/
 # OS
 .DS_Store
 Thumbs.db
+
+# Others
+dev-note.md
