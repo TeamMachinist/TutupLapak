@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -12,6 +13,13 @@ type Config struct {
 	App      AppConfig
 	Database DatabaseConfig
 	JWT      JWTConfig
+	Redis    RedisConfig
+}
+
+type RedisConfig struct {
+	Addr     string
+	Password string
+	DB       int
 }
 
 type AppConfig struct {
@@ -48,6 +56,11 @@ func Load() (*Config, error) {
 		jwtDuration = 24 * time.Hour
 	}
 
+	rdb, err := strconv.Atoi(getEnv("REDIS_DB", "0"))
+	if err != nil {
+		fmt.Print("REDIS DB NOT FOUND")
+	}
+
 	config := &Config{
 		App: AppConfig{
 			Port:    getEnv("PORT", "8002"),
@@ -67,6 +80,11 @@ func Load() (*Config, error) {
 			Secret:   getEnv("JWT_SECRET", "your-super-secret-key-change-in-production"),
 			Duration: jwtDuration,
 			Issuer:   getEnv("JWT_ISSUER", "tutuplapak-core-service"),
+		},
+		Redis: RedisConfig{
+			Addr:     getEnv("REDIS_ADDR", "localhost:6379"),
+			Password: getEnv("REDIS_PASSWORD", "redispass"),
+			DB:       rdb,
 		},
 	}
 
