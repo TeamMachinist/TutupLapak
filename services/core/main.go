@@ -82,11 +82,13 @@ func main() {
 		products.Delete("/:productId", jwtService.FiberMiddleware(), productHandler.DeleteProduct)
 
 	}
-	
+
 	// User management endpoints (auth-protected)
 	user := api.Group("/user")
 	{
-		user.Post("/link/phone", jwtService.FiberMiddleware(), userHandler.LinkPhone)
+		// user.Post("/link/phone", jwtService.FiberMiddleware(), userHandler.LinkPhone)
+		user.Get("", userHandler.GetUserWithFileId)
+		user.Put("", userHandler.UpdateUser)
 	}
 
 	purchase := api.Group("/purchase")
