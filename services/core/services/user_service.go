@@ -71,22 +71,22 @@ func (s *UserService) LinkPhone(ctx context.Context, userID uuid.UUID, phone str
 		BankAccountNumber: "",
 	}
 
-	if user.Email != nil {
-		response.Email = *user.Email
+	if user.Email != "" {
+		response.Email = user.Email
 	}
 
-	if user.Phone != nil {
-		response.Phone = *user.Phone
+	if user.Phone != "" {
+		response.Phone = user.Phone
 	}
 
-	if user.BankAccountName != nil {
-		response.BankAccountName = *user.BankAccountName
+	if user.BankAccountName != "" {
+		response.BankAccountName = user.BankAccountName
 	}
-	if user.BankAccountHolder != nil {
-		response.BankAccountHolder = *user.BankAccountHolder
+	if user.BankAccountHolder != "" {
+		response.BankAccountHolder = user.BankAccountHolder
 	}
-	if user.BankAccountNumber != nil {
-		response.BankAccountNumber = *user.BankAccountNumber
+	if user.BankAccountNumber != "" {
+		response.BankAccountNumber = user.BankAccountNumber
 	}
 
 	if user.FileID.Valid {

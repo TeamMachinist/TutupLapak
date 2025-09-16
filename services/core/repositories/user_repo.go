@@ -18,7 +18,7 @@ func NewUserRepository(db *database.Queries) *UserRepository {
 func (r *UserRepository) UpdateUserPhone(ctx context.Context, userID uuid.UUID, phone string) error {
 	_, err := r.db.UpdateUserPhone(ctx, database.UpdateUserPhoneParams{
 		ID:    userID,
-		Phone: &phone,
+		Phone: phone,
 	})
 	return err
 }
@@ -32,7 +32,7 @@ func (r *UserRepository) GetUserByID(ctx context.Context, userID uuid.UUID) (*da
 }
 
 func (r *UserRepository) CheckPhoneExists(ctx context.Context, phone string) (bool, error) {
-	result, err := r.db.CheckPhoneExists(ctx, &phone)
+	result, err := r.db.CheckPhoneExists(ctx, phone)
 	if err != nil {
 		return false, err
 	}
