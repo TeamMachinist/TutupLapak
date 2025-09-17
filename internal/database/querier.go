@@ -11,6 +11,7 @@ import (
 )
 
 type Querier interface {
+	CheckEmailExists(ctx context.Context, email string) (bool, error)
 	CheckExistedUserAuthByEmail(ctx context.Context, email string) (bool, error)
 	CheckPhoneExists(ctx context.Context, phone string) (bool, error)
 	CheckProductOwnership(ctx context.Context, arg CheckProductOwnershipParams) (bool, error)
