@@ -122,6 +122,46 @@ func (h *FileHandler) GetFile(w http.ResponseWriter, r *http.Request) {
 	api.WriteSuccess(w, r, response)
 }
 
+func (h *FileHandler) GetFiles(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+	idParam := r.URL.Query().Get("id")
+	fmt.Print(idParam)
+	logger.InfoCtx(ctx, "Get file request", "file_id", idParam)
+	
+	if idParam == "" {
+		logger.WarnCtx(ctx, "Missing file ID parameter")
+			api.WriteBadRequest(w, r, "Need the ID parameter")
+			return
+		}
+
+		ids := strings.Split(idParam, ",")
+		for i, id := range ids {
+			ids[i] = strings.TrimSpace(id)
+		}
+
+		var uuidIDs []uuid.UUID
+		for _, id := range ids {
+			uid, err := uuid.Parse(id)
+			if err != nil {
+				logger.WarnCtx(ctx, "Invalid file ID format", "file_id", id, "error", err)
+				api.WriteBadRequest(w, r, fmt.Sprintf("Invalid file ID format: %s", id))
+				return
+			}
+			uuidIDs = append(uuidIDs, uid)
+		}
+
+		// Dapatkan file dari service
+		files, err := h.fileService.GetFiles(ctx, uuidIDs)
+		if err != nil {
+			logger.ErrorCtx(ctx, "Failed to get files", "error", err)
+			api.WriteInternalServerError(w, r, "Failed to retrieve files")
+			return
+		}
+
+		logger.InfoCtx(ctx, "Files retrieved successfully", "file_ids", files)
+		api.WriteSuccess(w, r, files)
+}
 func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 	requestCtx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()

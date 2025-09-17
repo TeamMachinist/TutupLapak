@@ -16,3 +16,6 @@ SELECT * FROM files WHERE id = $1 AND user_id = $2;
 
 -- name: DeleteFile :exec
 DELETE FROM files WHERE id = $1;
+
+-- name: GetFilesByID :many
+SELECT id, file_uri, file_thumbnail_uri FROM files WHERE id = ANY($1::uuid[]);
