@@ -65,13 +65,13 @@ func main() {
 	}
 	jwtService := internal.NewJWTService(jwtConfig)
 
-	fileClient := clients.NewFileClient(cfg.App.FileUrl, jwtService)
+	fileClient := clients.NewFileClient(cfg.App.FileUrl)
 
 	productRepo := repositories.NewProductRepository(database.Queries)
 	purchaseRepo := repositories.NewPurchaseRepository(database.Pool)
 	userRepo := repositories.NewUserRepository(database.Queries)
 
-	productService := services.NewProductService(productRepo, fileClient)
+	productService := services.NewProductService(productRepo, fileClient, redisClient)
 	purchaseService := services.NewPurchaseService(purchaseRepo, fileClient)
 	userService := services.NewUserService(userRepo, fileClient, redisClient)
 

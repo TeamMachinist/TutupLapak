@@ -2,11 +2,16 @@ package services
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
+	"sort"
+	"strings"
 	"time"
 
+	"github.com/teammachinist/tutuplapak/internal/cache"
 	"github.com/teammachinist/tutuplapak/internal/database"
 	"github.com/teammachinist/tutuplapak/services/core/clients"
 	"github.com/teammachinist/tutuplapak/services/core/models"
@@ -32,6 +37,7 @@ type ProductService struct {
 	// userRepo	repositories.UserRepositoryInterface
 	// authClient  clients.AuthClientInterface
 	fileClient clients.FileClientInterface
+	cache      *cache.RedisCache
 }
 
 func NewProductService(
@@ -39,53 +45,77 @@ func NewProductService(
 	// userRepo repositories.UserRepositoryInterface,
 	// authClient clients.AuthClientInterface,
 	fileClient clients.FileClientInterface,
+	cache *cache.RedisCache,
 ) ProductServiceInterface {
 	return &ProductService{
 		productRepo: productRepo,
 		// userRepo:    userRepo,
 		// authClient:  authClient,
 		fileClient: fileClient,
+		cache:      cache,
 	}
 }
 
 func (s *ProductService) CreateProduct(ctx context.Context, req models.ProductRequest) (models.ProductResponse, error) {
 
 	_, err := s.productRepo.CheckSKUExistsByUser(ctx, req.SKU, req.UserID)
-	if err == nil {
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return models.ProductResponse{}, fmt.Errorf("failed to check SKU existence: %w", err)
+		}
+	} else {
 		return models.ProductResponse{}, errors.New("sku already exists")
 	}
 
-	productResp, err := s.productRepo.CreateProduct(ctx, req)
-	if err != nil {
-		return models.ProductResponse{}, err
-	}
-
 	if req.FileID != uuid.Nil {
-		file, err := s.fileClient.GetFileByID(ctx, req.FileID, req.UserID.String())
+		file, err := s.fileClient.GetFileByID(ctx, req.FileID)
 		if err != nil {
 			return models.ProductResponse{}, errors.New("fileId is not valid / exists")
 		}
 
-		if file.UserID != req.UserID.String() {
-			return models.ProductResponse{}, errors.New("fileId is not valid / exists")
-		}
+		log.Printf("[CreateProduct] File validated successfully: ID=%s, URI=%s", req.FileID, file.FileURI)
+	}
 
-		productResp.FileURI = file.FileURI
-		productResp.FileThumbnailURI = file.FileThumbnailURI
+	productResp, err := s.productRepo.CreateProduct(ctx, req)
+	if err != nil {
+		return models.ProductResponse{}, fmt.Errorf("failed to create product: %w", err)
+	}
+
+	log.Printf("[CreateProduct] Product created successfully with ID: %s", productResp.ProductID)
+
+	if req.FileID != uuid.Nil {
+		file, err := s.fileClient.GetFileByID(ctx, req.FileID)
+		if err != nil {
+			log.Printf("[CreateProduct] Failed to re-fetch file after creation: %v", err)
+		} else {
+			productResp.FileURI = file.FileURI
+			productResp.FileThumbnailURI = file.FileThumbnailURI
+			log.Printf("[CreateProduct] Attached file info to product response: URI=%s", file.FileURI)
+		}
 	}
 
 	return productResp, nil
 }
 
 func (s *ProductService) GetAllProducts(ctx context.Context, filter models.GetAllProductsParams) ([]models.ProductResponse, error) {
-	products, err := s.productRepo.GetAllProducts(ctx, filter)
+	key := cache.ProductListKey + generateFilterHash(filter)
+
+	var products []models.ProductResponse
+
+	err := s.cache.Get(ctx, key, &products)
+	if err == nil {
+		log.Printf("[GetAllProducts] Cache HIT for key: %s", key)
+		return products, nil
+	}
+
+	log.Printf("[GetAllProducts] Cache MISS for key: %s", key)
+	productsDB, err := s.productRepo.GetAllProducts(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
 
 	var responses []models.ProductResponse
-
-	for _, p := range products {
+	for _, p := range productsDB {
 		resp := models.ProductResponse{
 			ProductID: p.ID,
 			Name:      p.Name,
@@ -96,18 +126,24 @@ func (s *ProductService) GetAllProducts(ctx context.Context, filter models.GetAl
 			FileID:    p.FileID,
 			CreatedAt: p.CreatedAt,
 			UpdatedAt: p.UpdatedAt,
-			// FileURI & FileThumbnailURI akan diisi di bawah
 		}
 
 		if p.FileID != uuid.Nil {
-			file, err := s.fileClient.GetFileByID(ctx, p.FileID, p.UserID.String()) // ← p.UserID!
+			file, err := s.fileClient.GetFileByID(ctx, p.FileID)
 			if err == nil {
 				resp.FileURI = file.FileURI
 				resp.FileThumbnailURI = file.FileThumbnailURI
+			} else {
+				log.Printf("[GetAllProducts] Failed to fetch file %s: %v", p.FileID, err)
 			}
 		}
 
 		responses = append(responses, resp)
+	}
+
+	err = s.cache.Set(ctx, key, responses, cache.ProductListTTL)
+	if err != nil {
+		log.Printf("[GetAllProducts] Failed to set cache: %v", err)
 	}
 
 	return responses, nil
@@ -146,14 +182,10 @@ func (s *ProductService) UpdateProduct(
 
 	// Validasi & ambil metadata file jika user ingin ubah file
 	if req.FileID != uuid.Nil {
-		file, err := s.fileClient.GetFileByID(ctx, req.FileID, userID.String())
+		file, err := s.fileClient.GetFileByID(ctx, req.FileID)
 		if err != nil {
 			return models.ProductResponse{}, errors.New("fileId is not valid / exists")
 		}
-		if file.UserID != userID.String() {
-			return models.ProductResponse{}, errors.New("fileId is not valid / exists")
-		}
-
 		fileMetadata = file
 	}
 
@@ -171,7 +203,6 @@ func (s *ProductService) UpdateProduct(
 		return models.ProductResponse{}, err
 	}
 
-	// 5. Mapping ke ProductResponse (by value)
 	resp := models.ProductResponse{
 		ProductID:        updatedRow.ID,
 		Name:             updatedRow.Name,
@@ -186,13 +217,11 @@ func (s *ProductService) UpdateProduct(
 		FileThumbnailURI: "",
 	}
 
-	// Gunakan metadata yang sudah diambil, atau ambil baru jika diperlukan
 	if fileMetadata != nil {
 		resp.FileURI = fileMetadata.FileURI
 		resp.FileThumbnailURI = fileMetadata.FileThumbnailURI
 	} else if updatedRow.FileID != uuid.Nil {
-		// Ambil metadata file lama (jika tidak diubah)
-		file, err := s.fileClient.GetFileByID(ctx, updatedRow.FileID, userID.String())
+		file, err := s.fileClient.GetFileByID(ctx, updatedRow.FileID)
 		if err == nil {
 
 			resp.FileURI = file.FileURI
@@ -221,4 +250,36 @@ func (s *ProductService) DeleteProduct(ctx context.Context, productID uuid.UUID,
 	}
 
 	return nil
+}
+
+func generateFilterHash(filter models.GetAllProductsParams) string {
+	// Konversi semua field filter ke string, urutkan agar konsisten
+	var parts []string
+
+	if filter.Limit > 0 {
+		parts = append(parts, fmt.Sprintf("limit=%d", filter.Limit))
+	}
+	if filter.Offset > 0 {
+		parts = append(parts, fmt.Sprintf("offset=%d", filter.Offset))
+	}
+	if filter.ProductID != nil {
+		parts = append(parts, fmt.Sprintf("productId=%s", filter.ProductID.String()))
+	}
+	if filter.SKU != nil {
+		parts = append(parts, fmt.Sprintf("sku=%s", *filter.SKU))
+	}
+	if filter.Category != nil {
+		parts = append(parts, fmt.Sprintf("category=%s", *filter.Category))
+	}
+	if filter.SortBy != nil {
+		parts = append(parts, fmt.Sprintf("sortBy=%s", *filter.SortBy))
+	}
+
+	// Urutkan agar key konsisten meski parameter beda urutan
+	sort.Strings(parts)
+
+	// Gabungkan dan hash
+	input := strings.Join(parts, "&")
+	hash := sha256.Sum256([]byte(input))
+	return fmt.Sprintf("%x", hash[:])
 }
