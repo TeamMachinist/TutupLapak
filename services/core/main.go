@@ -73,7 +73,7 @@ func main() {
 
 	productService := services.NewProductService(productRepo, fileClient, redisClient)
 	purchaseService := services.NewPurchaseService(purchaseRepo, fileClient)
-	userService := services.NewUserService(userRepo, fileClient)
+	userService := services.NewUserService(userRepo, fileClient, redisClient)
 
 	productHandler := handlers.NewProductHandler(productService)
 	purchaseHandler := handlers.NewPurchaseHandler(purchaseService)
@@ -87,6 +87,7 @@ func main() {
 		products.Post("", jwtService.FiberMiddleware(), productHandler.CreateProduct)
 		products.Put("/:productId", jwtService.FiberMiddleware(), productHandler.UpdateProduct)
 		products.Delete("/:productId", jwtService.FiberMiddleware(), productHandler.DeleteProduct)
+
 	}
 
 	// User management endpoints (auth-protected)
@@ -94,6 +95,8 @@ func main() {
 	{
 		user.Post("/link/phone", jwtService.FiberMiddleware(), userHandler.LinkPhone)
 		user.Post("/link/email", jwtService.FiberMiddleware(), userHandler.LinkEmail)
+		user.Get("", jwtService.FiberMiddleware(), userHandler.GetUserWithFileId)
+		user.Put("", jwtService.FiberMiddleware(), userHandler.UpdateUser)
 	}
 
 	purchase := api.Group("/purchase")

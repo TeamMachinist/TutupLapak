@@ -217,30 +217,27 @@ func (q *Queries) GetUserWithAuth(ctx context.Context, id uuid.UUID) (GetUserWit
 
 const updateUser = `-- name: UpdateUser :one
 UPDATE users SET
-    email = COALESCE($2, email),
-    phone = COALESCE($3, phone),
-    bank_account_name = COALESCE($4, bank_account_name),
-    bank_account_holder = COALESCE($5, bank_account_holder),
-    bank_account_number = COALESCE($6, bank_account_number),
+    file_id = COALESCE($2, file_id),
+    bank_account_name = $3,
+    bank_account_holder = $4,
+    bank_account_number = $5,
     updated_at = CURRENT_TIMESTAMP
 WHERE id = $1
 RETURNING id, user_auth_id, file_id, email, phone, bank_account_name, bank_account_holder, bank_account_number, created_at, updated_at
 `
 
 type UpdateUserParams struct {
-	ID                uuid.UUID `json:"id"`
-	Email             string    `json:"email"`
-	Phone             string    `json:"phone"`
-	BankAccountName   string    `json:"bank_account_name"`
-	BankAccountHolder string    `json:"bank_account_holder"`
-	BankAccountNumber string    `json:"bank_account_number"`
+	ID                uuid.UUID  `json:"id"`
+	FileID            *uuid.UUID `json:"file_id"`
+	BankAccountName   string     `json:"bank_account_name"`
+	BankAccountHolder string     `json:"bank_account_holder"`
+	BankAccountNumber string     `json:"bank_account_number"`
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (Users, error) {
 	row := q.db.QueryRow(ctx, updateUser,
 		arg.ID,
-		arg.Email,
-		arg.Phone,
+		arg.FileID,
 		arg.BankAccountName,
 		arg.BankAccountHolder,
 		arg.BankAccountNumber,
