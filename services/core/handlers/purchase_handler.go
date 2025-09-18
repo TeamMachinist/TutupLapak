@@ -5,6 +5,7 @@ import (
 	"context"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -36,8 +37,8 @@ func (h *PurchaseHandler) CreatePurchase(c *fiber.Ctx) error {
 		if item.ProductID == uuid.Nil {
 			return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "productId is required"})
 		}
-		if item.Qty < 1 {
-			return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "qty must be at least 1"})
+		if item.Qty < 2 { // ← min: 2, bukan 1
+			return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "qty must be at least 2"})
 		}
 	}
 
@@ -70,14 +71,56 @@ func (h *PurchaseHandler) CreatePurchase(c *fiber.Ctx) error {
 	resp, err := h.purchaseService.CreatePurchase(context.Background(), req)
 	if err != nil {
 		switch {
-		case err.Error() == "product not found",
-			err.Error()[:22] == "insufficient stock for",
-			err.Error() == "failed to update stock":
-			return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		case err.Error() == "product not found":
+			return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "invalid product ID"})
+		case strings.HasPrefix(err.Error(), "insufficient stock for"):
+			return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "quantity exceeds available stock"})
 		default:
-			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "Internal server error"})
+			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
 		}
 	}
 
 	return c.Status(http.StatusCreated).JSON(resp)
+}
+
+func (h *PurchaseHandler) UploadPaymentProof(c *fiber.Ctx) error {
+	purchaseId := c.Params("purchaseId")
+
+	var body struct {
+		FileIds []string `json:"fileIds" validate:"required,min=1,dive"`
+	}
+
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid request body",
+		})
+	}
+
+	if len(body.FileIds) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "fileIds must not be empty",
+		})
+	}
+
+	err := h.purchaseService.UploadPaymentProof(c.Context(), purchaseId, body.FileIds)
+	if err != nil {
+		// Handle error secara spesifik
+		if strings.Contains(err.Error(), "purchase not found") ||
+			strings.Contains(err.Error(), "purchase is not in unpaid status") ||
+			strings.Contains(err.Error(), "expected") ||
+			strings.Contains(err.Error(), "invalid or non-existent file IDs") ||
+			strings.Contains(err.Error(), "invalid request body") {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		}
+
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "internal server error",
+		})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"message": "payment proof processed successfully, purchase marked as paid and stock reduced",
+	})
 }

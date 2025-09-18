@@ -13,11 +13,10 @@ SELECT * FROM users WHERE user_auth_id = $1;
 
 -- name: UpdateUser :one
 UPDATE users SET
-    email = COALESCE($2, email),
-    phone = COALESCE($3, phone),
-    bank_account_name = COALESCE($4, bank_account_name),
-    bank_account_holder = COALESCE($5, bank_account_holder),
-    bank_account_number = COALESCE($6, bank_account_number),
+    file_id = COALESCE($2, file_id),
+    bank_account_name = $3,
+    bank_account_holder = $4,
+    bank_account_number = $5,
     updated_at = CURRENT_TIMESTAMP
 WHERE id = $1
 RETURNING *;
@@ -61,3 +60,6 @@ SELECT
 FROM users u
 JOIN users_auth ua ON u.user_auth_id = ua.id
 WHERE u.id = $1;
+
+-- name: CheckEmailExists :one
+SELECT EXISTS(SELECT 1 FROM users WHERE email = $1) as exists;

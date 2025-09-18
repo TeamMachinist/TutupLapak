@@ -27,7 +27,7 @@ type ProductRequest struct {
 	Qty      int       `json:"qty" validate:"required,min=1"`
 	Price    int       `json:"price" validate:"required,min=100"`
 	SKU      string    `json:"sku" validate:"required,max=32"`
-	FileID   uuid.UUID `json:"fileId" validate:"required" `
+	FileID   string    `json:"fileId" validate:"required,uuid" `
 	UserID   uuid.UUID `json:"userId" `
 }
 

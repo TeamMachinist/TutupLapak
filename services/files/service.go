@@ -109,7 +109,8 @@ func (s FileService) GetFile(ctx context.Context, fileID uuid.UUID) (File, error
 
 	dbFile, err := s.queries.GetFile(ctx, fileID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		fmt.Printf("ErrorErrorErrorError: %s", err)
+		if err.Error() == "no rows in result set" {
 			logger.WarnCtx(ctx, "File not found", "file_id", fileID)
 			return File{}, fmt.Errorf("file not found")
 		}
@@ -138,6 +139,22 @@ func (s FileService) GetFile(ctx context.Context, fileID uuid.UUID) (File, error
 	logger.InfoCtx(ctx, "File retrieved from database", "file_id", fileID)
 	return file, nil
 }
+
+func (s FileService) GetFiles(ctx context.Context, fileID []uuid.UUID) ([]database.GetFilesByIDRow, error) {
+	logger.DebugCtx(ctx, "Getting file", "file_id", fileID)
+	file, err := s.queries.GetFilesByID(ctx, fileID)
+	logger.Info("file id", file)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			logger.WarnCtx(ctx, "File not found", "file_id", fileID)
+			return nil, fmt.Errorf("file not found")
+		}
+		logger.ErrorCtx(ctx, "Failed to get file from database", "error", err, "file_id", fileID)
+		return nil, fmt.Errorf("failed to get file: %w", err)
+	}
+	return file, nil
+}
+
 
 func (s FileService) DeleteFiles(ctx context.Context, fileID uuid.UUID, userID string) error {
 	logger.InfoCtx(ctx, "Deleting file", "file_id", fileID, "user_id", userID)

@@ -37,7 +37,12 @@ func (q *Queries) CheckPhoneExists(ctx context.Context, phone string) (bool, err
 const createUserAuth = `-- name: CreateUserAuth :one
 INSERT INTO users_auth (phone, password_hash)
 VALUES ($1, $2)
-RETURNING id, email, phone, password_hash, created_at
+RETURNING 
+    id, 
+    COALESCE(email, '') as email,     -- return empty string instead of NULL
+    COALESCE(phone, '') as phone,     -- return empty string instead of NULL       
+    password_hash, 
+    created_at
 `
 
 type CreateUserAuthParams struct {
@@ -67,7 +72,12 @@ func (q *Queries) CreateUserAuth(ctx context.Context, arg CreateUserAuthParams) 
 }
 
 const getUserAuthByEmail = `-- name: GetUserAuthByEmail :one
-SELECT id, email, phone, password_hash, created_at
+SELECT
+    id,
+    COALESCE(email, '') as email,
+    COALESCE(phone, '') as phone,
+    password_hash,
+    created_at
 FROM users_auth
 WHERE email = $1
 `
@@ -93,35 +103,13 @@ func (q *Queries) GetUserAuthByEmail(ctx context.Context, email string) (GetUser
 	return i, err
 }
 
-const getUserAuthByID = `-- name: GetUserAuthByID :one
-SELECT id, email, phone, password_hash, created_at
-FROM users_auth
-WHERE id = $1
-`
-
-type GetUserAuthByIDRow struct {
-	ID           uuid.UUID `json:"id"`
-	Email        string    `json:"email"`
-	Phone        string    `json:"phone"`
-	PasswordHash string    `json:"password_hash"`
-	CreatedAt    time.Time `json:"created_at"`
-}
-
-func (q *Queries) GetUserAuthByID(ctx context.Context, id uuid.UUID) (GetUserAuthByIDRow, error) {
-	row := q.db.QueryRow(ctx, getUserAuthByID, id)
-	var i GetUserAuthByIDRow
-	err := row.Scan(
-		&i.ID,
-		&i.Email,
-		&i.Phone,
-		&i.PasswordHash,
-		&i.CreatedAt,
-	)
-	return i, err
-}
-
 const getUserAuthByPhone = `-- name: GetUserAuthByPhone :one
-SELECT id, email, phone, password_hash, created_at
+SELECT
+    id,
+    COALESCE(email, '') as email,
+    COALESCE(phone, '') as phone,
+    password_hash,
+    created_at
 FROM users_auth
 WHERE phone = $1
 `
@@ -150,7 +138,12 @@ func (q *Queries) GetUserAuthByPhone(ctx context.Context, phone string) (GetUser
 const registerWithEmail = `-- name: RegisterWithEmail :one
 INSERT INTO users_auth (email, password_hash)
 VALUES ($1, $2)
-RETURNING id, email, phone, password_hash, created_at
+RETURNING
+    id,
+    COALESCE(email, '') as email,     -- return empty string instead of NULL
+    COALESCE(phone, '') as phone,     -- return empty string instead of NULL
+    password_hash,
+    created_at
 `
 
 type RegisterWithEmailParams struct {

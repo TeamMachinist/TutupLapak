@@ -92,6 +92,36 @@ func (q *Queries) GetFileByIDAndUserID(ctx context.Context, arg GetFileByIDAndUs
 	return i, err
 }
 
+const getFilesByID = `-- name: GetFilesByID :many
+SELECT id, file_uri, file_thumbnail_uri FROM files WHERE id = ANY($1::uuid[])
+`
+
+type GetFilesByIDRow struct {
+	ID               uuid.UUID `json:"id"`
+	FileUri          string    `json:"file_uri"`
+	FileThumbnailUri string    `json:"file_thumbnail_uri"`
+}
+
+func (q *Queries) GetFilesByID(ctx context.Context, dollar_1 []uuid.UUID) ([]GetFilesByIDRow, error) {
+	rows, err := q.db.Query(ctx, getFilesByID, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetFilesByIDRow{}
+	for rows.Next() {
+		var i GetFilesByIDRow
+		if err := rows.Scan(&i.ID, &i.FileUri, &i.FileThumbnailUri); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getFilesByUser = `-- name: GetFilesByUser :many
 SELECT id, user_id, file_uri, file_thumbnail_uri, created_at FROM files WHERE user_id = $1
 `

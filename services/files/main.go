@@ -20,7 +20,7 @@ import (
 
 type Config struct {
 	HTTPPort    string `env:"PORT" envDefault:"8003"`
-	DatabaseURL string `env:"DATABASE_URL"`
+	DatabaseURL string `env:"DATABASE_URL" envDefault:""`
 
 	// JWT Configuration
 	JWTSecret   string        `env:"JWT_SECRET" envDefault:"tutupsecret"`
@@ -184,6 +184,7 @@ func setupRoutes(services Services, deps Dependencies) *chi.Mux {
 
 	// Pragmatically no auth for now, to ease fetch by core service (purchase)
 	r.Get("/api/v1/file/{fileId}", services.FileHandler.GetFile)
+	r.Get("/api/v1/file", services.FileHandler.GetFiles)
 
 	// API routes with authentication
 	r.Route("/api/v1", func(r chi.Router) {
