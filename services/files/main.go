@@ -20,7 +20,7 @@ import (
 
 type Config struct {
 	HTTPPort    string `env:"PORT" envDefault:"8003"`
-	DatabaseURL string `env:"DATABASE_URL"`
+	DatabaseURL string `env:"DATABASE_URL" envDefault:""`
 
 	// JWT Configuration
 	JWTSecret   string        `env:"JWT_SECRET" envDefault:"tutupsecret"`

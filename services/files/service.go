@@ -109,7 +109,8 @@ func (s FileService) GetFile(ctx context.Context, fileID uuid.UUID) (File, error
 
 	dbFile, err := s.queries.GetFile(ctx, fileID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		fmt.Printf("ErrorErrorErrorError: %s", err)
+		if err.Error() == "no rows in result set" {
 			logger.WarnCtx(ctx, "File not found", "file_id", fileID)
 			return File{}, fmt.Errorf("file not found")
 		}

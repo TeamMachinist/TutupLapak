@@ -120,3 +120,4 @@ func (fc *FileClient) GetFilesByIDList(ctx context.Context, fileIDs []string) ([
 
 	return filesResp, nil
 }
+

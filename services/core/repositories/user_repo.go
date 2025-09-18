@@ -3,16 +3,44 @@ package repositories
 import (
 	"context"
 
-	"github.com/google/uuid"
 	"github.com/teammachinist/tutuplapak/internal/database"
+
+	"github.com/google/uuid"
 )
 
-type UserRepository struct {
-	db *database.Queries
+type UserRepositoryInterface interface {
+	GetUserByID(ctx context.Context, userID uuid.UUID) (database.Users, error)
+	UpdateUser(ctx context.Context, args database.UpdateUserParams) (database.Users, error)
+	UpdateUserPhone(ctx context.Context, userID uuid.UUID, phone string) error
+	CheckPhoneExists(ctx context.Context, phone string) (bool, error)
+	CheckEmailExists(ctx context.Context, email string) (bool, error)
+	UpdateUserEmail(ctx context.Context, userID uuid.UUID, email string) error
 }
 
-func NewUserRepository(db *database.Queries) *UserRepository {
-	return &UserRepository{db: db}
+type UserRepository struct {
+	db database.Querier
+}
+
+func NewUserRepository(database database.Querier) UserRepositoryInterface {
+	return &UserRepository{db: database}
+}
+
+func (r *UserRepository) GetUserByID(ctx context.Context, userID uuid.UUID) (database.Users, error) {
+	rows, err := r.db.GetUserByID(ctx, userID)
+	if err != nil {
+		return database.Users{}, err
+	}
+	return rows, nil
+}
+
+func (r *UserRepository) UpdateUser(ctx context.Context, args database.UpdateUserParams) (database.Users, error) {
+	rows, err := r.db.UpdateUser(ctx, args)
+
+	if err != nil {
+		return database.Users{}, err
+	}
+	return rows, nil
+
 }
 
 func (r *UserRepository) UpdateUserPhone(ctx context.Context, userID uuid.UUID, phone string) error {
@@ -21,14 +49,6 @@ func (r *UserRepository) UpdateUserPhone(ctx context.Context, userID uuid.UUID, 
 		Phone: phone,
 	})
 	return err
-}
-
-func (r *UserRepository) GetUserByID(ctx context.Context, userID uuid.UUID) (*database.Users, error) {
-	user, err := r.db.GetUserByID(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	return &user, nil
 }
 
 func (r *UserRepository) CheckPhoneExists(ctx context.Context, phone string) (bool, error) {

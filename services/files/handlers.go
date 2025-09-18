@@ -100,6 +100,7 @@ func (h *FileHandler) GetFile(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if err.Error() == "file not found" || err.Error() == "not found" {
 			logger.WarnCtx(ctx, "File not found", "file_id", fileId)
+			logger.ErrorCtx(ctx, "masuk sini", "error", err)
 			api.WriteNotFound(w, r, "File not found")
 			return
 		}
@@ -114,6 +115,7 @@ func (h *FileHandler) GetFile(w http.ResponseWriter, r *http.Request) {
 	// Format response according to API spec (no user_id exposed)
 	response := map[string]interface{}{
 		"id":                 file.ID,
+		"user_id":            file.UserID,
 		"file_uri":           file.FileURI,
 		"file_thumbnail_uri": file.FileThumbnailURI,
 		"created_at":         file.CreatedAt,
