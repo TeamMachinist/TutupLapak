@@ -10,6 +10,7 @@ import (
 
 type UserRepositoryInterface interface {
 	GetUsersWithFileId(ctx context.Context, userID uuid.UUID) (database.GetUserWithFileIdRow, error)
+	GetUserByID(ctx context.Context, userID uuid.UUID) (database.Users, error)
 	UpdateUser(ctx context.Context, args database.UpdateUserParams) (database.Users, error)
 }
 
@@ -25,6 +26,14 @@ func (r *UserRepository) GetUsersWithFileId(ctx context.Context, userID uuid.UUI
 	rows, err := r.db.GetUserWithFileId(ctx, userID)
 	if err != nil {
 		return database.GetUserWithFileIdRow{}, err
+	}
+	return rows, nil
+}
+
+func (r *UserRepository) GetUserByID(ctx context.Context, userID uuid.UUID) (database.Users, error) {
+	rows, err := r.db.GetUserByID(ctx, userID)
+	if err != nil {
+		return database.Users{}, err
 	}
 	return rows, nil
 }

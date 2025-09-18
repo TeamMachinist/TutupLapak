@@ -89,16 +89,16 @@ type Purchases struct {
 }
 
 type Users struct {
-	ID                uuid.UUID `json:"id"`
-	UserAuthID        uuid.UUID `json:"user_auth_id"`
-	FileID            uuid.UUID `json:"file_id"`
-	Email             string    `json:"email"`
-	Phone             string    `json:"phone"`
-	BankAccountName   string    `json:"bank_account_name"`
-	BankAccountHolder string    `json:"bank_account_holder"`
-	BankAccountNumber string    `json:"bank_account_number"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	ID                uuid.UUID  `json:"id"`
+	UserAuthID        uuid.UUID  `json:"user_auth_id"`
+	FileID            *uuid.UUID `json:"file_id"`
+	Email             string     `json:"email"`
+	Phone             string     `json:"phone"`
+	BankAccountName   string     `json:"bank_account_name"`
+	BankAccountHolder string     `json:"bank_account_holder"`
+	BankAccountNumber string     `json:"bank_account_number"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
 }
 
 type UsersAuth struct {

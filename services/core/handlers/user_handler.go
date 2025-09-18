@@ -2,11 +2,12 @@ package handlers
 
 import (
 	"fmt"
-	// "net/http"
+	"net/http"
+
 	// "regexp"
 	// "strings"
 
-	// "github.com/teammachinist/tutuplapak/internal"
+	"github.com/teammachinist/tutuplapak/internal"
 	"github.com/teammachinist/tutuplapak/services/core/models"
 	"github.com/teammachinist/tutuplapak/services/core/services"
 
@@ -109,12 +110,34 @@ func NewUserHandler(userService services.UserServiceInterface) *UserHandler {
 // }
 
 func (h *UserHandler) GetUserWithFileId(c *fiber.Ctx) error {
-	var userID = uuid.MustParse("00000000-0000-0000-0000-000000000012")
+	userIDStr, ok := internal.GetUserIDFromFiber(c)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "unauthorized: user not authenticated",
+		})
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "invalid user id in token",
+		})
+	}
 	fmt.Printf("masuk handler: %s", userID.String())
+
 	ctx := c.Context()
 	rows, err := h.userService.GetUserWithFileId(ctx, userID)
 	if err != nil {
-		return err
+		switch err.Error() {
+		case "user not found":
+			return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+				"error": "User not found",
+			})
+		default:
+			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Server error",
+			})
+		}
 	}
 	return c.Status(fiber.StatusOK).JSON(rows)
 }
@@ -122,13 +145,19 @@ func (h *UserHandler) GetUserWithFileId(c *fiber.Ctx) error {
 func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 	ctx := c.Context()
 
-	userId := uuid.MustParse("00000000-0000-0000-0000-000000000012")
-	// userId, err := uuid.Parse(userIdStr)
-	// if err != nil {
-	// 	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-	// 		"error": "invalid product id format",
-	// 	})
-	// }
+	userIDStr, ok := internal.GetUserIDFromFiber(c)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "unauthorized: user not authenticated",
+		})
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "invalid user id in token",
+		})
+	}
 
 	req := models.UserRequest{}
 	if err := c.BodyParser(&req); err != nil {
@@ -137,8 +166,14 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 		})
 	}
 
-	validate := validator.New()
+	if err := uuid.Validate(*req.FileID); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   "Validation error",
+			"details": "fileId is not valid",
+		})
+	}
 
+	validate := validator.New()
 	if err := validate.Struct(req); err != nil {
 		var details []string
 		for _, ve := range err.(validator.ValidationErrors) {
@@ -160,11 +195,26 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 		})
 	}
 
-	rows, err := h.userService.UpdateUser(ctx, userId, req)
+	rows, err := h.userService.UpdateUser(ctx, userID, req)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Server Error",
-		})
+		switch err.Error() {
+		// case "user not found or invalid token":
+		// 	return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+		// 		"error": "Invalid or expired token",
+		// 	})
+		case "file not found":
+			return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "fileId is not valid / exists",
+			})
+		case "unauthorized: you don't own this file":
+			return c.Status(http.StatusForbidden).JSON(fiber.Map{
+				"error": "you don't own this file",
+			})
+		default:
+			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Server error",
+			})
+		}
 	}
 
 	return c.Status(fiber.StatusOK).JSON(rows)

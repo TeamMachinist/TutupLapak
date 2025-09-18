@@ -5,7 +5,7 @@
 INSERT INTO users_auth (
     id, email, phone, password_hash
 ) VALUES (
-    '00000000-0000-0000-0000-000000000000', 
+    '00000000-0000-0000-0000-000000000004', 
     'tutuplapak@projectsprint.com', 
     '', 
     '$2a$10$Jy7S4Ea8VgcbeVLrhNaQz.TdHKUEyMFzTkAercFa3TPqee/bKV67.'
@@ -31,7 +31,7 @@ INSERT INTO users (
     id, user_auth_id, file_id, email, phone, bank_account_name, bank_account_holder, bank_account_number
 ) VALUES (
     '00000000-0000-0000-0000-000000000010',
-    '00000000-0000-0000-0000-000000000000',
+    '00000000-0000-0000-0000-000000000004',
     NULL,
     'tutuplapak@projectsprint.com',
     '',

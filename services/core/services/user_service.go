@@ -2,11 +2,13 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	// "errors"
+
 	// "regexp"
 	// "strings"
 
+	"github.com/teammachinist/tutuplapak/internal/cache"
 	"github.com/teammachinist/tutuplapak/internal/database"
 	"github.com/teammachinist/tutuplapak/services/core/clients"
 	"github.com/teammachinist/tutuplapak/services/core/models"
@@ -24,12 +26,18 @@ type UserServiceInterface interface {
 type UserService struct {
 	userRepo   repositories.UserRepositoryInterface
 	fileClient clients.FileClientInterface
+	cache      *cache.RedisCache
 }
 
-func NewUserService(userRepo repositories.UserRepositoryInterface, fileClient clients.FileClientInterface) UserServiceInterface {
+func NewUserService(
+	userRepo repositories.UserRepositoryInterface,
+	fileClient clients.FileClientInterface,
+	cache *cache.RedisCache,
+) UserServiceInterface {
 	return &UserService{
 		userRepo:   userRepo,
 		fileClient: fileClient,
+		cache:      cache,
 	}
 }
 
@@ -139,33 +147,143 @@ func NewUserService(userRepo repositories.UserRepositoryInterface, fileClient cl
 
 func (s *UserService) GetUserWithFileId(ctx context.Context, userID uuid.UUID) (models.UserResponse, error) {
 	fmt.Printf("masuk service: %s", userID.String())
-	rows, err := s.userRepo.GetUsersWithFileId(ctx, userID)
-	if err != nil {
-		return models.UserResponse{}, err
+	var userFile models.UserResponse
+	if err := s.cache.Get(ctx, fmt.Sprintf(cache.UserFileListKey, userID.String()), &userFile); err == nil {
+		return models.UserResponse{
+			Email:             userFile.Email,
+			Phone:             userFile.Phone,
+			FileID:            userFile.FileID,
+			URI:               userFile.URI,
+			ThumbnailURI:      userFile.ThumbnailURI,
+			BankAccountName:   userFile.BankAccountName,
+			BankAccountHolder: userFile.BankAccountHolder,
+			BankAccountNumber: userFile.BankAccountNumber,
+		}, nil
 	}
+
+	// TODO: Pisah query
+	rows, err := s.userRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		return models.UserResponse{}, errors.New("user does not exist")
+	}
+
+	var file *clients.FileMetadataResponse
+	if err := s.cache.Get(ctx, cache.FileMetadataKey, file); err != nil {
+		clientFile, err := s.fileClient.GetFileByID(ctx, *rows.FileID, userID.String())
+		if err != nil {
+			return models.UserResponse{}, err
+		}
+		file = clientFile
+	}
+
+	// rows, err := s.userRepo.GetUsersWithFileId(ctx, userID)
+
 	resp := models.UserResponse{
 		Email:             rows.Email,
 		Phone:             rows.Phone,
-		FileID:            rows.ID.String(),
-		URI:               rows.FileUri,
-		ThumbnailURI:      rows.FileThumbnailUri,
+		FileID:            rows.FileID.String(),
+		URI:               file.FileURI,
+		ThumbnailURI:      file.FileThumbnailURI,
 		BankAccountName:   rows.BankAccountName,
 		BankAccountHolder: rows.BankAccountHolder,
 		BankAccountNumber: rows.BankAccountNumber,
+	}
+	if err = s.cache.Set(ctx, fmt.Sprintf(cache.UserFileListKey, userID.String()), resp, cache.FileListTTL); err != nil {
+		fmt.Printf("[UserFileList] Failed to set cache: %v", err)
 	}
 	return resp, nil
 }
 
 func (s *UserService) UpdateUser(ctx context.Context,
-	userId uuid.UUID,
+	userID uuid.UUID,
 	req models.UserRequest,
 ) (models.UserResponse, error) {
+	var userFile models.UserResponse
 
-	fileID := stringPtrToUUID(req.FileID)
+	fileUUID := stringPtrToUUID(req.FileID)
+
+	fileID := ""
+	fileURI := ""
+	fileThumbnailURI := ""
+
+	if err := s.cache.Get(ctx, fmt.Sprintf(cache.UserFileListKey, userID.String()), &userFile); err == nil {
+		if userFile.BankAccountName == req.BankAccountName &&
+			userFile.BankAccountHolder == req.BankAccountHolder &&
+			userFile.BankAccountNumber == req.BankAccountNumber {
+			if req.FileID != nil {
+				if userFile.FileID == *req.FileID {
+					return userFile, nil
+				}
+			} else {
+				return userFile, nil
+			}
+		}
+	}
+	// if err := s.cache.Get(ctx, cacheKey, &cachedFile); err == nil {
+	// 	logger.DebugCtx(ctx, "File retrieved from cache", "file_id", fileID)
+	// 	return cachedFile, nil
+	// }
+
+	// check exist & ownership
+	if req.FileID != nil && *req.FileID != "" && *req.FileID != uuid.Nil.String() {
+		// Check file exist
+		var file *clients.FileMetadataResponse
+		fmt.Printf("masuk sini")
+		if err := s.cache.Get(ctx, cache.FileMetadataKey, file); err != nil {
+			fmt.Printf("masuk error cache")
+			clientFile, err := s.fileClient.GetFileByID(ctx, *fileUUID, userID.String())
+			if err != nil {
+				fmt.Printf("masuk error client: %s", err)
+				return models.UserResponse{}, err
+			}
+			file = clientFile
+		}
+
+		// Check Ownership
+		fmt.Printf("userId.String: %s", userID.String())
+		fmt.Printf("file.UserID: %s", file.UserID)
+		if userID.String() != file.UserID {
+			return models.UserResponse{}, errors.New("unauthorized: you don't own this file")
+		}
+
+		fileID = file.ID.String()
+		fileURI = file.FileURI
+		fileThumbnailURI = file.FileThumbnailURI
+
+		rows, err := s.userRepo.UpdateUser(ctx, database.UpdateUserParams{
+			ID:                userID,
+			FileID:            fileUUID,
+			BankAccountName:   req.BankAccountName,
+			BankAccountHolder: req.BankAccountHolder,
+			BankAccountNumber: req.BankAccountNumber,
+		})
+
+		if err != nil {
+			return models.UserResponse{}, err
+		}
+
+		resp := models.UserResponse{
+			Email:             rows.Email,
+			Phone:             rows.Phone,
+			FileID:            fileID,
+			URI:               fileURI,
+			ThumbnailURI:      fileThumbnailURI,
+			BankAccountName:   rows.BankAccountName,
+			BankAccountHolder: rows.BankAccountHolder,
+			BankAccountNumber: rows.BankAccountNumber,
+		}
+
+		if err = s.cache.Set(ctx, fmt.Sprintf(cache.UserFileListKey, userID.String()), resp, cache.FileListTTL); err != nil {
+			fmt.Printf("[UserFileList] Failed to set cache: %v", err)
+		}
+
+		return resp, nil
+	}
+
+	// TODO: GET User dlu ni dari db biar dpt file id, keknya gk ush udh ada coalesce
 
 	rows, err := s.userRepo.UpdateUser(ctx, database.UpdateUserParams{
-		ID:                userId,
-		FileID:            fileID,
+		ID:                userID,
 		BankAccountName:   req.BankAccountName,
 		BankAccountHolder: req.BankAccountHolder,
 		BankAccountNumber: req.BankAccountNumber,
@@ -175,45 +293,32 @@ func (s *UserService) UpdateUser(ctx context.Context,
 		return models.UserResponse{}, err
 	}
 
-	newFileID := ""
-	fileURI := ""
-	fileThumbnailURI := ""
-	if rows.FileID != uuid.Nil {
-		fmt.Print("masuk uuid not Nil")
-		fmt.Printf("userID: %s", userId.String())
-		fmt.Printf("fileID: %s", rows.FileID.String())
-		file, err := s.fileClient.GetFileByID(ctx, rows.FileID, userId.String())
-		if err == nil {
-			// newFileID = file.ID.String()
-			fileURI = file.FileURI
-			fileThumbnailURI = file.FileThumbnailURI
-		}
-		// fmt.Printf("fileID: %s", file.ID.String())
-		// fmt.Printf("fileID2: %s", newFileID)
-		fmt.Printf("erros: %s", err)
-	}
-
 	resp := models.UserResponse{
 		Email:             rows.Email,
 		Phone:             rows.Phone,
-		FileID:            newFileID,
+		FileID:            fileID,
 		URI:               fileURI,
 		ThumbnailURI:      fileThumbnailURI,
 		BankAccountName:   rows.BankAccountName,
 		BankAccountHolder: rows.BankAccountHolder,
 		BankAccountNumber: rows.BankAccountNumber,
 	}
+
+	if err = s.cache.Set(ctx, fmt.Sprintf(cache.UserFileListKey, userID.String()), resp, cache.FileListTTL); err != nil {
+		fmt.Printf("[UserFileList] Failed to set cache: %v", err)
+	}
+
 	return resp, nil
 }
 
 // Helper: safely convert *string to *uuid.UUID
-func stringPtrToUUID(s *string) uuid.UUID {
+func stringPtrToUUID(s *string) *uuid.UUID {
 	if s == nil || *s == "" {
-		return uuid.Nil
+		return nil
 	}
 	parsed, err := uuid.Parse(*s)
 	if err != nil {
-		return uuid.Nil
+		return nil
 	}
-	return parsed
+	return &parsed
 }

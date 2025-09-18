@@ -258,11 +258,11 @@ RETURNING id, user_auth_id, file_id, email, phone, bank_account_name, bank_accou
 `
 
 type UpdateUserParams struct {
-	ID                uuid.UUID `json:"id"`
-	FileID            uuid.UUID `json:"file_id"`
-	BankAccountName   string    `json:"bank_account_name"`
-	BankAccountHolder string    `json:"bank_account_holder"`
-	BankAccountNumber string    `json:"bank_account_number"`
+	ID                uuid.UUID  `json:"id"`
+	FileID            *uuid.UUID `json:"file_id"`
+	BankAccountName   string     `json:"bank_account_name"`
+	BankAccountHolder string     `json:"bank_account_holder"`
+	BankAccountNumber string     `json:"bank_account_number"`
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (Users, error) {
