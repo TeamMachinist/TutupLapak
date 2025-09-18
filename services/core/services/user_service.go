@@ -66,11 +66,13 @@ func (s *UserService) LinkPhone(ctx context.Context, userID uuid.UUID, phone str
 
 	// Get file data if fileID exists
 	var fileURI, fileThumbnailURI string
-	if user.FileID.Valid {
-		file, err := s.fileClient.GetFileByID(ctx, uuid.UUID(user.FileID.Bytes))
-		if err == nil {
-			fileURI = file.FileURI
-			fileThumbnailURI = file.FileThumbnailURI
+	if user.FileID != nil {
+		if err := uuid.Validate(user.FileID.String()); err == nil {
+			file, err := s.fileClient.GetFileByID(ctx, *user.FileID)
+			if err == nil {
+				fileURI = file.FileURI
+				fileThumbnailURI = file.FileThumbnailURI
+			}
 		}
 	}
 
@@ -102,8 +104,10 @@ func (s *UserService) LinkPhone(ctx context.Context, userID uuid.UUID, phone str
 		response.BankAccountNumber = user.BankAccountNumber
 	}
 
-	if user.FileID.Valid {
-		response.FileID = uuid.UUID(user.FileID.Bytes).String()
+	if user.FileID != nil {
+		if err := uuid.Validate(user.FileID.String()); err == nil {
+			response.FileID = user.FileID.String()
+		}
 	}
 
 	return response, nil
@@ -134,13 +138,16 @@ func (s *UserService) LinkEmail(ctx context.Context, userID uuid.UUID, email str
 
 	// Get file data if fileID exists
 	var fileURI, fileThumbnailURI string
-	if user.FileID.Valid {
-		file, err := s.fileClient.GetFileByID(ctx, uuid.UUID(user.FileID.Bytes))
-		if err == nil {
-			fileURI = file.FileURI
-			fileThumbnailURI = file.FileThumbnailURI
+	if user.FileID != nil {
+		if err := uuid.Validate(user.FileID.String()); err == nil {
+			file, err := s.fileClient.GetFileByID(ctx, *user.FileID)
+			if err == nil {
+				fileURI = file.FileURI
+				fileThumbnailURI = file.FileThumbnailURI
+			}
 		}
 	}
+	fmt.Printf("error apa nih: %s", err)
 
 	// Build response
 	response := &models.LinkEmailResponse{
@@ -170,8 +177,10 @@ func (s *UserService) LinkEmail(ctx context.Context, userID uuid.UUID, email str
 		response.BankAccountNumber = user.BankAccountNumber
 	}
 
-	if user.FileID.Valid {
-		response.FileID = uuid.UUID(user.FileID.Bytes).String()
+	if user.FileID != nil {
+		if err := uuid.Validate(user.FileID.String()); err == nil {
+			response.FileID = user.FileID.String()
+		}
 	}
 
 	return response, nil
@@ -218,14 +227,12 @@ func (s *UserService) GetUserWithFileId(ctx context.Context, userID uuid.UUID) (
 
 	var file *clients.FileMetadataResponse
 	if err := s.cache.Get(ctx, cache.FileMetadataKey, file); err != nil {
-		clientFile, err := s.fileClient.GetFileByID(ctx, *rows.FileID, userID.String())
+		clientFile, err := s.fileClient.GetFileByID(ctx, *rows.FileID)
 		if err != nil {
 			return models.UserResponse{}, err
 		}
 		file = clientFile
 	}
-
-	// rows, err := s.userRepo.GetUsersWithFileId(ctx, userID)
 
 	resp := models.UserResponse{
 		Email:             rows.Email,
@@ -280,7 +287,7 @@ func (s *UserService) UpdateUser(ctx context.Context,
 		fmt.Printf("masuk sini")
 		if err := s.cache.Get(ctx, cache.FileMetadataKey, file); err != nil {
 			fmt.Printf("masuk error cache")
-			clientFile, err := s.fileClient.GetFileByID(ctx, *fileUUID, userID.String())
+			clientFile, err := s.fileClient.GetFileByID(ctx, *fileUUID)
 			if err != nil {
 				fmt.Printf("masuk error client: %s", err)
 				return models.UserResponse{}, err
@@ -328,8 +335,6 @@ func (s *UserService) UpdateUser(ctx context.Context,
 
 		return resp, nil
 	}
-
-	// TODO: GET User dlu ni dari db biar dpt file id, keknya gk ush udh ada coalesce
 
 	rows, err := s.userRepo.UpdateUser(ctx, database.UpdateUserParams{
 		ID:                userID,
