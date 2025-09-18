@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -19,18 +20,42 @@ type ProductRepositoryInterface interface {
 	UpdateProduct(ctx context.Context, params database.UpdateProductParams) (database.UpdateProductRow, error)
 	CheckProductOwnership(ctx context.Context, productID uuid.UUID, userID uuid.UUID) (bool, error)
 	DeleteProduct(ctx context.Context, productID uuid.UUID, userID uuid.UUID) error
+	UpdateProductQty(ctx context.Context, productID string, qty int) error
 }
 
 type ProductRepository struct {
 	db database.Querier
 }
 
-func NewProductRepository(database database.Querier) ProductRepositoryInterface {
-	return &ProductRepository{db: database}
+// UpdateProductQty implements ProductRepositoryInterface.
+func (r *ProductRepository) UpdateProductQty(ctx context.Context, productID string, qty int) error {
+	parsedId, err := uuid.Parse(productID)
+	if err != nil {
+		return err
+	}
+
+	result, err := r.db.UpdateProductQty(ctx, database.UpdateProductQtyParams{
+		ID:  parsedId,
+		Qty: qty,
+	})
+	if err != nil {
+		return err
+	}
+
+	if result == 0 {
+		return errors.New("insufficient stock or product not found")
+	}
+
+	return nil
 }
 
 func (r *ProductRepository) CreateProduct(ctx context.Context, req models.ProductRequest) (models.ProductResponse, error) {
 	productID := uuid.Must(uuid.NewV7())
+
+	fileID, err := uuid.Parse(req.FileID)
+	if err != nil {
+		return models.ProductResponse{}, err
+	}
 
 	dbProduct, err := r.db.CreateProduct(ctx, database.CreateProductParams{
 		ID:        productID,
@@ -39,7 +64,7 @@ func (r *ProductRepository) CreateProduct(ctx context.Context, req models.Produc
 		Qty:       req.Qty,
 		Price:     req.Price,
 		Sku:       req.SKU,
-		FileID:    req.FileID,
+		FileID:    fileID,
 		UserID:    req.UserID,
 		CreatedAt: time.Now().UTC(),
 		UpdatedAt: time.Now().UTC(),
@@ -52,8 +77,8 @@ func (r *ProductRepository) CreateProduct(ctx context.Context, req models.Produc
 		ProductID:        dbProduct.ID,
 		Name:             dbProduct.Name,
 		Category:         dbProduct.Category,
-		Qty:              int(dbProduct.Qty),
-		Price:            int(dbProduct.Price),
+		Qty:              dbProduct.Qty,
+		Price:            dbProduct.Price,
 		SKU:              dbProduct.Sku,
 		FileID:           dbProduct.FileID,
 		FileURI:          "",
@@ -173,4 +198,8 @@ func (r *ProductRepository) DeleteProduct(ctx context.Context, productID uuid.UU
 		UserID: userID,
 	})
 	return err
+}
+
+func NewProductRepository(database database.Querier) ProductRepositoryInterface {
+	return &ProductRepository{db: database}
 }

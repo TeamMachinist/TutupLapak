@@ -50,7 +50,7 @@ WHERE
     AND p.category = COALESCE(NULLIF(@category::text, ''), p.category)
 ORDER BY 
     CASE WHEN @sort_by::text = 'newest' THEN GREATEST(p.created_at, p.updated_at) END DESC,
-    CASE WHEN @sort_by::text = 'oldest' THEN GREATEST(p.created_at, p.updated_at) END ASC,
+    CASE WHEN @sort_by::text = 'oldest' THEN LEAST(p.created_at, p.updated_at) END ASC,
     CASE WHEN @sort_by::text = 'cheapest' THEN p.price END ASC,
     CASE WHEN @sort_by::text = 'expensive' THEN p.price END DESC,
     p.created_at DESC
@@ -80,10 +80,11 @@ SELECT EXISTS(
 DELETE FROM products
 WHERE id = @id::uuid AND user_id = @user_id::uuid;
 
+
 -- name: UpdateProductQty :execrows
-UPDATE products 
-SET qty = qty - $2 
-WHERE id = $1;
+UPDATE products
+SET qty = qty - @qty::int
+WHERE id = @id::uuid AND qty >= @qty::int;
 
 -- name: GetProductByID :one
 SELECT 
