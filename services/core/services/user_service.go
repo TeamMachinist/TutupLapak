@@ -4,9 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
-	// "regexp"
-	// "strings"
+	"regexp"
+	"strings"
 
 	"github.com/teammachinist/tutuplapak/internal/cache"
 	"github.com/teammachinist/tutuplapak/internal/database"
@@ -18,7 +17,8 @@ import (
 )
 
 type UserServiceInterface interface {
-	// LinkPhone(ctx context.Context, userID uuid.UUID, phone string) (*models.LinkPhoneResponse, error)
+	LinkPhone(ctx context.Context, userID uuid.UUID, phone string) (*models.LinkPhoneResponse, error)
+	LinkEmail(ctx context.Context, userID uuid.UUID, email string) (*models.LinkEmailResponse, error)
 	GetUserWithFileId(ctx context.Context, userID uuid.UUID) (models.UserResponse, error)
 	UpdateUser(ctx context.Context, userId uuid.UUID, req models.UserRequest) (models.UserResponse, error)
 }
@@ -41,109 +41,158 @@ func NewUserService(
 	}
 }
 
-// type PurchaseServiceInterface interface {
-// 	CreatePurchase(ctx context.Context, req models.PurchaseRequest) (models.PurchaseResponse, error)
-// }
+func (s *UserService) LinkPhone(ctx context.Context, userID uuid.UUID, phone string) (*models.LinkPhoneResponse, error) {
+	if err := s.validatePhone(phone); err != nil {
+		return nil, err
+	}
 
-// type PurchaseService struct {
-// 	purchaseRepo repositories.PurchaseRepositoryInterface
-// 	fileClient   clients.FileClientInterface
-// }
+	exists, err := s.userRepo.CheckPhoneExists(ctx, phone)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return nil, errors.New("phone is taken")
+	}
 
-// func NewPurchaseService(
-// 	purchaseRepo repositories.PurchaseRepositoryInterface,
-// 	fileClient clients.FileClientInterface,
-// ) PurchaseServiceInterface {
-// 	return &PurchaseService{
-// 		purchaseRepo: purchaseRepo,
-// 		fileClient:   fileClient,
-// 	}
-// }
+	err = s.userRepo.UpdateUserPhone(ctx, userID, phone)
+	if err != nil {
+		return nil, err
+	}
 
-// func (s *UserService) LinkPhone(ctx context.Context, userID uuid.UUID, phone string) (*models.LinkPhoneResponse, error) {
-// 	if err := s.validatePhone(phone); err != nil {
-// 		return nil, err
-// 	}
+	user, err := s.userRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
 
-// 	exists, err := s.userRepo.CheckPhoneExists(ctx, phone)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	if exists {
-// 		return nil, errors.New("phone is taken")
-// 	}
+	// Get file data if fileID exists
+	var fileURI, fileThumbnailURI string
+	if user.FileID.Valid {
+		file, err := s.fileClient.GetFileByID(ctx, uuid.UUID(user.FileID.Bytes))
+		if err == nil {
+			fileURI = file.FileURI
+			fileThumbnailURI = file.FileThumbnailURI
+		}
+	}
 
-// 	err = s.userRepo.UpdateUserPhone(ctx, userID, phone)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+	// Build response
+	response := &models.LinkPhoneResponse{
+		FileID:            "",
+		FileURI:           fileURI,
+		FileThumbnailURI:  fileThumbnailURI,
+		BankAccountName:   "",
+		BankAccountHolder: "",
+		BankAccountNumber: "",
+	}
 
-// 	user, err := s.userRepo.GetUserByID(ctx, userID)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+	if user.Email != "" {
+		response.Email = user.Email
+	}
 
-// 	// Get file data if fileID exists
-// 	var fileURI, fileThumbnailURI string
-// 	if user.FileID.Valid {
-// 		file, err := s.fileClient.GetFileByID(ctx, uuid.UUID(user.FileID.Bytes), userID.String())
-// 		if err == nil {
-// 			fileURI = file.FileURI
-// 			fileThumbnailURI = file.FileThumbnailURI
-// 		}
-// 	}
+	if user.Phone != "" {
+		response.Phone = user.Phone
+	}
 
-// 	// Build response
-// 	response := &models.LinkPhoneResponse{
-// 		FileID:            "",
-// 		FileURI:           fileURI,
-// 		FileThumbnailURI:  fileThumbnailURI,
-// 		BankAccountName:   "",
-// 		BankAccountHolder: "",
-// 		BankAccountNumber: "",
-// 	}
+	if user.BankAccountName != "" {
+		response.BankAccountName = user.BankAccountName
+	}
+	if user.BankAccountHolder != "" {
+		response.BankAccountHolder = user.BankAccountHolder
+	}
+	if user.BankAccountNumber != "" {
+		response.BankAccountNumber = user.BankAccountNumber
+	}
 
-// 	if user.Email != nil {
-// 		response.Email = *user.Email
-// 	}
+	if user.FileID.Valid {
+		response.FileID = uuid.UUID(user.FileID.Bytes).String()
+	}
 
-// 	if user.Phone != nil {
-// 		response.Phone = *user.Phone
-// 	}
+	return response, nil
+}
 
-// 	if user.BankAccountName != nil {
-// 		response.BankAccountName = *user.BankAccountName
-// 	}
-// 	if user.BankAccountHolder != nil {
-// 		response.BankAccountHolder = *user.BankAccountHolder
-// 	}
-// 	if user.BankAccountNumber != nil {
-// 		response.BankAccountNumber = *user.BankAccountNumber
-// 	}
+func (s *UserService) LinkEmail(ctx context.Context, userID uuid.UUID, email string) (*models.LinkEmailResponse, error) {
+	if err := s.validateEmail(email); err != nil {
+		return nil, err
+	}
 
-// 	if user.FileID.Valid {
-// 		response.FileID = uuid.UUID(user.FileID.Bytes).String()
-// 	}
+	exists, err := s.userRepo.CheckEmailExists(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return nil, errors.New("email is taken")
+	}
 
-// 	return response, nil
-// }
+	err = s.userRepo.UpdateUserEmail(ctx, userID, email)
+	if err != nil {
+		return nil, err
+	}
 
-// func (s *UserService) validatePhone(phone string) error {
-// 	if phone == "" {
-// 		return errors.New("phone is required")
-// 	}
+	user, err := s.userRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
 
-// 	if !strings.HasPrefix(phone, "+") {
-// 		return errors.New("phone must start with international calling code prefix '+'")
-// 	}
+	// Get file data if fileID exists
+	var fileURI, fileThumbnailURI string
+	if user.FileID.Valid {
+		file, err := s.fileClient.GetFileByID(ctx, uuid.UUID(user.FileID.Bytes))
+		if err == nil {
+			fileURI = file.FileURI
+			fileThumbnailURI = file.FileThumbnailURI
+		}
+	}
 
-// 	phoneRegex := regexp.MustCompile(`^\+[1-9]\d{1,14}$`)
-// 	if !phoneRegex.MatchString(phone) {
-// 		return errors.New("invalid phone number format")
-// 	}
+	// Build response
+	response := &models.LinkEmailResponse{
+		FileID:            "",
+		FileURI:           fileURI,
+		FileThumbnailURI:  fileThumbnailURI,
+		BankAccountName:   "",
+		BankAccountHolder: "",
+		BankAccountNumber: "",
+	}
 
-// 	return nil
-// }
+	if user.Email != "" {
+		response.Email = user.Email
+	}
+
+	if user.Phone != "" {
+		response.Phone = user.Phone
+	}
+
+	if user.BankAccountName != "" {
+		response.BankAccountName = user.BankAccountName
+	}
+	if user.BankAccountHolder != "" {
+		response.BankAccountHolder = user.BankAccountHolder
+	}
+	if user.BankAccountNumber != "" {
+		response.BankAccountNumber = user.BankAccountNumber
+	}
+
+	if user.FileID.Valid {
+		response.FileID = uuid.UUID(user.FileID.Bytes).String()
+	}
+
+	return response, nil
+}
+
+func (s *UserService) validatePhone(phone string) error {
+	if phone == "" {
+		return errors.New("phone is required")
+	}
+
+	if !strings.HasPrefix(phone, "+") {
+		return errors.New("phone must start with international calling code prefix '+'")
+	}
+
+	phoneRegex := regexp.MustCompile(`^\+[1-9]\d{1,14}$`)
+	if !phoneRegex.MatchString(phone) {
+		return errors.New("invalid phone number format")
+	}
+
+	return nil
+}
 
 func (s *UserService) GetUserWithFileId(ctx context.Context, userID uuid.UUID) (models.UserResponse, error) {
 	fmt.Printf("masuk service: %s", userID.String())
@@ -321,4 +370,18 @@ func stringPtrToUUID(s *string) *uuid.UUID {
 		return nil
 	}
 	return &parsed
+}
+
+func (s *UserService) validateEmail(email string) error {
+	if email == "" {
+		return errors.New("email is required")
+	}
+
+	// Basic email validation regex
+	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
+	if !emailRegex.MatchString(email) {
+		return errors.New("invalid email format")
+	}
+
+	return nil
 }

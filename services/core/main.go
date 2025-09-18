@@ -93,7 +93,8 @@ func main() {
 	// User management endpoints (auth-protected)
 	user := api.Group("/user")
 	{
-		// user.Post("/link/phone", jwtService.FiberMiddleware(), userHandler.LinkPhone)
+		user.Post("/link/phone", jwtService.FiberMiddleware(), userHandler.LinkPhone)
+		user.Post("/link/email", jwtService.FiberMiddleware(), userHandler.LinkEmail)
 		user.Get("", jwtService.FiberMiddleware(), userHandler.GetUserWithFileId)
 		user.Put("", jwtService.FiberMiddleware(), userHandler.UpdateUser)
 	}

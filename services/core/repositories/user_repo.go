@@ -9,9 +9,12 @@ import (
 )
 
 type UserRepositoryInterface interface {
-	GetUsersWithFileId(ctx context.Context, userID uuid.UUID) (database.GetUserWithFileIdRow, error)
 	GetUserByID(ctx context.Context, userID uuid.UUID) (database.Users, error)
 	UpdateUser(ctx context.Context, args database.UpdateUserParams) (database.Users, error)
+	UpdateUserPhone(ctx context.Context, userID uuid.UUID, phone string) error
+	CheckPhoneExists(ctx context.Context, phone string) (bool, error)
+	CheckEmailExists(ctx context.Context, email string) (bool, error)
+	UpdateUserEmail(ctx context.Context, userID uuid.UUID, email string) error
 }
 
 type UserRepository struct {
@@ -20,14 +23,6 @@ type UserRepository struct {
 
 func NewUserRepository(database database.Querier) UserRepositoryInterface {
 	return &UserRepository{db: database}
-}
-
-func (r *UserRepository) GetUsersWithFileId(ctx context.Context, userID uuid.UUID) (database.GetUserWithFileIdRow, error) {
-	rows, err := r.db.GetUserWithFileId(ctx, userID)
-	if err != nil {
-		return database.GetUserWithFileIdRow{}, err
-	}
-	return rows, nil
 }
 
 func (r *UserRepository) GetUserByID(ctx context.Context, userID uuid.UUID) (database.Users, error) {
@@ -48,26 +43,34 @@ func (r *UserRepository) UpdateUser(ctx context.Context, args database.UpdateUse
 
 }
 
-// func (r *UserRepository) UpdateUserPhone(ctx context.Context, userID uuid.UUID, phone string) error {
-// 	_, err := r.db.UpdateUserPhone(ctx, database.UpdateUserPhoneParams{
-// 		ID:    userID,
-// 		Phone: &phone,
-// 	})
-// 	return err
-// }
+func (r *UserRepository) UpdateUserPhone(ctx context.Context, userID uuid.UUID, phone string) error {
+	_, err := r.db.UpdateUserPhone(ctx, database.UpdateUserPhoneParams{
+		ID:    userID,
+		Phone: phone,
+	})
+	return err
+}
 
-// func (r *UserRepository) GetUserByID(ctx context.Context, userID uuid.UUID) (*database.Users, error) {
-// 	user, err := r.db.GetUserByID(ctx, userID)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return &user, nil
-// }
+func (r *UserRepository) CheckPhoneExists(ctx context.Context, phone string) (bool, error) {
+	result, err := r.db.CheckPhoneExists(ctx, phone)
+	if err != nil {
+		return false, err
+	}
+	return result, nil
+}
 
-// func (r *UserRepository) CheckPhoneExists(ctx context.Context, phone string) (bool, error) {
-// 	result, err := r.db.CheckPhoneExists(ctx, &phone)
-// 	if err != nil {
-// 		return false, err
-// 	}
-// 	return result, nil
-// }
+func (r *UserRepository) CheckEmailExists(ctx context.Context, email string) (bool, error) {
+	result, err := r.db.CheckEmailExists(ctx, email)
+	if err != nil {
+		return false, err
+	}
+	return result, nil
+}
+
+func (r *UserRepository) UpdateUserEmail(ctx context.Context, userID uuid.UUID, email string) error {
+	_, err := r.db.UpdateUserEmail(ctx, database.UpdateUserEmailParams{
+		ID:    userID,
+		Email: email,
+	})
+	return err
+}

@@ -12,6 +12,17 @@ import (
 	"github.com/google/uuid"
 )
 
+const checkEmailExists = `-- name: CheckEmailExists :one
+SELECT EXISTS(SELECT 1 FROM users WHERE email = $1) as exists
+`
+
+func (q *Queries) CheckEmailExists(ctx context.Context, email string) (bool, error) {
+	row := q.db.QueryRow(ctx, checkEmailExists, email)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (
     id, user_auth_id, email, phone, bank_account_name, bank_account_holder, bank_account_number
@@ -200,48 +211,6 @@ func (q *Queries) GetUserWithAuth(ctx context.Context, id uuid.UUID) (GetUserWit
 		&i.UpdatedAt,
 		&i.PasswordHash,
 		&i.AuthCreatedAt,
-	)
-	return i, err
-}
-
-const getUserWithFileId = `-- name: GetUserWithFileId :one
-SELECT 
-    u.email,
-    u.phone,
-    f.id,
-    f.file_uri,
-    f.file_thumbnail_uri,
-    u.bank_account_name,
-    u.bank_account_holder,
-    u.bank_account_number
-FROM users u
-JOIN files f ON u.id = f.user_id
-WHERE u.id = $1
-`
-
-type GetUserWithFileIdRow struct {
-	Email             string    `json:"email"`
-	Phone             string    `json:"phone"`
-	ID                uuid.UUID `json:"id"`
-	FileUri           string    `json:"file_uri"`
-	FileThumbnailUri  string    `json:"file_thumbnail_uri"`
-	BankAccountName   string    `json:"bank_account_name"`
-	BankAccountHolder string    `json:"bank_account_holder"`
-	BankAccountNumber string    `json:"bank_account_number"`
-}
-
-func (q *Queries) GetUserWithFileId(ctx context.Context, id uuid.UUID) (GetUserWithFileIdRow, error) {
-	row := q.db.QueryRow(ctx, getUserWithFileId, id)
-	var i GetUserWithFileIdRow
-	err := row.Scan(
-		&i.Email,
-		&i.Phone,
-		&i.ID,
-		&i.FileUri,
-		&i.FileThumbnailUri,
-		&i.BankAccountName,
-		&i.BankAccountHolder,
-		&i.BankAccountNumber,
 	)
 	return i, err
 }

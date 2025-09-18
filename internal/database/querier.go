@@ -11,6 +11,7 @@ import (
 )
 
 type Querier interface {
+	CheckEmailExists(ctx context.Context, email string) (bool, error)
 	CheckExistedUserAuthByEmail(ctx context.Context, email string) (bool, error)
 	CheckPhoneExists(ctx context.Context, phone string) (bool, error)
 	CheckProductOwnership(ctx context.Context, arg CheckProductOwnershipParams) (bool, error)
@@ -36,7 +37,6 @@ type Querier interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (Users, error)
 	GetUserByPhone(ctx context.Context, phone string) (Users, error)
 	GetUserWithAuth(ctx context.Context, id uuid.UUID) (GetUserWithAuthRow, error)
-	GetUserWithFileId(ctx context.Context, id uuid.UUID) (GetUserWithFileIdRow, error)
 	RegisterWithEmail(ctx context.Context, arg RegisterWithEmailParams) (RegisterWithEmailRow, error)
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (UpdateProductRow, error)
 	UpdateProductQty(ctx context.Context, arg UpdateProductQtyParams) (int64, error)
