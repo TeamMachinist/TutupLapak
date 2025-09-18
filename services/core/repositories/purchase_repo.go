@@ -97,7 +97,7 @@ func (r *PurchaseRepository) CreatePurchase(ctx context.Context, req models.Purc
 		}
 
 		//  Validasi stok
-		if itemReq.Qty > int(productInTx.Qty) {
+		if itemReq.Qty > productInTx.Qty {
 			return models.PurchaseResponse{}, errors.New("insufficient stock for product: " + productInTx.Name)
 		}
 

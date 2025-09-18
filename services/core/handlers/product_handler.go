@@ -297,7 +297,7 @@ func (h *ProductHandler) UpdateProduct(c *fiber.Ctx) error {
 		case errors.Is(err, context.DeadlineExceeded):
 			return c.Status(fiber.StatusRequestTimeout).JSON(fiber.Map{"error": "request timeout"})
 		case err.Error() == "unauthorized: you don't own this product":
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": err.Error()})
 		case err.Error() == "sku already exists for your account":
 			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": err.Error()})
 		case err.Error() == "fileId is not valid / exists":
@@ -345,7 +345,7 @@ func (h *ProductHandler) DeleteProduct(c *fiber.Ctx) error {
 	if err != nil {
 		switch {
 		case err.Error() == "unauthorized: you don't own this product":
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
 				"error": err.Error(),
 			})
 		case strings.Contains(err.Error(), "no rows in result set"):
@@ -359,7 +359,5 @@ func (h *ProductHandler) DeleteProduct(c *fiber.Ctx) error {
 		}
 	}
 
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "product deleted successfully",
-	})
+	return c.Status(fiber.StatusOK).JSON(nil)
 }

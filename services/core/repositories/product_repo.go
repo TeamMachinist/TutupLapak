@@ -52,6 +52,11 @@ func (r *ProductRepository) UpdateProductQty(ctx context.Context, productID stri
 func (r *ProductRepository) CreateProduct(ctx context.Context, req models.ProductRequest) (models.ProductResponse, error) {
 	productID := uuid.Must(uuid.NewV7())
 
+	fileID, err := uuid.Parse(req.FileID)
+	if err != nil {
+		return models.ProductResponse{}, err
+	}
+
 	dbProduct, err := r.db.CreateProduct(ctx, database.CreateProductParams{
 		ID:        productID,
 		Name:      req.Name,
@@ -59,7 +64,7 @@ func (r *ProductRepository) CreateProduct(ctx context.Context, req models.Produc
 		Qty:       req.Qty,
 		Price:     req.Price,
 		Sku:       req.SKU,
-		FileID:    req.FileID,
+		FileID:    fileID,
 		UserID:    req.UserID,
 		CreatedAt: time.Now().UTC(),
 		UpdatedAt: time.Now().UTC(),

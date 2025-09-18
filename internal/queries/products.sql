@@ -50,7 +50,7 @@ WHERE
     AND p.category = COALESCE(NULLIF(@category::text, ''), p.category)
 ORDER BY 
     CASE WHEN @sort_by::text = 'newest' THEN GREATEST(p.created_at, p.updated_at) END DESC,
-    CASE WHEN @sort_by::text = 'oldest' THEN GREATEST(p.created_at, p.updated_at) END ASC,
+    CASE WHEN @sort_by::text = 'oldest' THEN LEAST(p.created_at, p.updated_at) END ASC,
     CASE WHEN @sort_by::text = 'cheapest' THEN p.price END ASC,
     CASE WHEN @sort_by::text = 'expensive' THEN p.price END DESC,
     p.created_at DESC

@@ -28,7 +28,6 @@ type PurchaseService struct {
 
 func (s *PurchaseService) CreatePurchase(ctx context.Context, req models.PurchaseRequest) (models.PurchaseResponse, error) {
 
-	// ✅ Panggil repo — transaksi di-handle di dalamnya
 	resp, err := s.purchaseRepo.CreatePurchase(ctx, req)
 	if err != nil {
 		return models.PurchaseResponse{}, err

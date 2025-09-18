@@ -67,9 +67,18 @@ func (s *ProductService) CreateProduct(ctx context.Context, req models.ProductRe
 		return models.ProductResponse{}, errors.New("sku already exists")
 	}
 
-	var file *clients.FileMetadataResponse // <-- sesuaikan tipe
-	if req.FileID != uuid.Nil {
-		f, err := s.fileClient.GetFileByID(ctx, req.FileID)
+	var parsedFileId uuid.UUID
+
+	fileID, err := uuid.Parse(req.FileID)
+	if err != nil {
+		return models.ProductResponse{}, err
+	}
+
+	parsedFileId = fileID
+
+	var file *clients.FileMetadataResponse
+	if req.FileID != "" {
+		f, err := s.fileClient.GetFileByID(ctx, parsedFileId)
 		if err != nil {
 			return models.ProductResponse{}, errors.New("file not found") // tetap pakai string ini untuk handler
 		}
@@ -176,9 +185,17 @@ func (s *ProductService) UpdateProduct(
 	}
 	var fileMetadata *clients.FileMetadataResponse
 
-	// Validasi & ambil metadata file jika user ingin ubah file
-	if req.FileID != uuid.Nil {
-		file, err := s.fileClient.GetFileByID(ctx, req.FileID)
+	var parsedFileId uuid.UUID
+
+	fileID, err := uuid.Parse(req.FileID)
+	if err != nil {
+		return models.ProductResponse{}, err
+	}
+
+	parsedFileId = fileID
+
+	if req.FileID != "" {
+		file, err := s.fileClient.GetFileByID(ctx, parsedFileId)
 		if err != nil {
 			return models.ProductResponse{}, errors.New("fileId is not valid / exists")
 		}
@@ -192,7 +209,7 @@ func (s *ProductService) UpdateProduct(
 		Qty:       req.Qty,
 		Price:     req.Price,
 		Sku:       req.SKU,
-		FileID:    req.FileID,
+		FileID:    parsedFileId,
 		UpdatedAt: time.Now(),
 	})
 	if err != nil {
@@ -219,7 +236,6 @@ func (s *ProductService) UpdateProduct(
 	} else if updatedRow.FileID != uuid.Nil {
 		file, err := s.fileClient.GetFileByID(ctx, updatedRow.FileID)
 		if err == nil {
-
 			resp.FileURI = file.FileURI
 			resp.FileThumbnailURI = file.FileThumbnailURI
 		}
