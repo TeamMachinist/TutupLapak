@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS products (
     category VARCHAR(100) NOT NULL,
     qty INTEGER NOT NULL DEFAULT 0,
     price INTEGER NOT NULL DEFAULT 0,
-    sku VARCHAR(25) UNIQUE NOT NULL,
+    sku VARCHAR(25) NOT NULL,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     file_id UUID NOT NULL REFERENCES files(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -12,7 +12,6 @@ CREATE TABLE IF NOT EXISTS products (
 );
 
 CREATE INDEX idx_products_category ON products(category);
-CREATE INDEX idx_products_sku ON products(sku);
 CREATE INDEX idx_products_name ON products(name);
 CREATE INDEX idx_products_created_at ON products(created_at);
 CREATE INDEX idx_products_user_id ON products(user_id);

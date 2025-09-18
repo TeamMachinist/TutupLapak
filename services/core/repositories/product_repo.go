@@ -29,8 +29,13 @@ type ProductRepository struct {
 
 // UpdateProductQty implements ProductRepositoryInterface.
 func (r *ProductRepository) UpdateProductQty(ctx context.Context, productID string, qty int) error {
+	parsedId, err := uuid.Parse(productID)
+	if err != nil {
+		return err
+	}
+
 	result, err := r.db.UpdateProductQty(ctx, database.UpdateProductQtyParams{
-		ID:  productID,
+		ID:  parsedId,
 		Qty: qty,
 	})
 	if err != nil {

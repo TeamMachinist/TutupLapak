@@ -9,10 +9,10 @@ SELECT id, sender_name, sender_contact_type, sender_contact_detail,
        purchased_items, payment_details, total_price, status,
        created_at, updated_at
 FROM purchases
-WHERE id = @purchaseId::text;
+WHERE id = @purchaseId::uuid;
 
 -- name: UpdatePurchaseStatus :exec
 UPDATE purchases
-SET status = @status::text,
+SET status = @status::purchase_status,
     updated_at = NOW()
-WHERE id = @purchaseId::text;
+WHERE id = @purchaseId::uuid;

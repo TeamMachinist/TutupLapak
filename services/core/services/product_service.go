@@ -57,7 +57,7 @@ func NewProductService(
 }
 
 func (s *ProductService) CreateProduct(ctx context.Context, req models.ProductRequest) (models.ProductResponse, error) {
-
+	// Check if SKU already exists for the user
 	_, err := s.productRepo.CheckSKUExistsByUser(ctx, req.SKU, req.UserID)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
@@ -67,32 +67,28 @@ func (s *ProductService) CreateProduct(ctx context.Context, req models.ProductRe
 		return models.ProductResponse{}, errors.New("sku already exists")
 	}
 
+	var file *clients.FileMetadataResponse // <-- sesuaikan tipe
 	if req.FileID != uuid.Nil {
-		file, err := s.fileClient.GetFileByID(ctx, req.FileID)
+		f, err := s.fileClient.GetFileByID(ctx, req.FileID)
 		if err != nil {
-			return models.ProductResponse{}, errors.New("fileId is not valid / exists")
+			return models.ProductResponse{}, errors.New("file not found") // tetap pakai string ini untuk handler
 		}
-
-		log.Printf("[CreateProduct] File validated successfully: ID=%s, URI=%s", req.FileID, file.FileURI)
+		file = f
 	}
 
+	// Create product
 	productResp, err := s.productRepo.CreateProduct(ctx, req)
 	if err != nil {
 		return models.ProductResponse{}, fmt.Errorf("failed to create product: %w", err)
 	}
 
-	log.Printf("[CreateProduct] Product created successfully with ID: %s", productResp.ProductID)
-
-	if req.FileID != uuid.Nil {
-		file, err := s.fileClient.GetFileByID(ctx, req.FileID)
-		if err != nil {
-			log.Printf("[CreateProduct] Failed to re-fetch file after creation: %v", err)
-		} else {
-			productResp.FileURI = file.FileURI
-			productResp.FileThumbnailURI = file.FileThumbnailURI
-			log.Printf("[CreateProduct] Attached file info to product response: URI=%s", file.FileURI)
-		}
+	// Attach file info if present
+	if file != nil {
+		productResp.FileURI = file.FileURI
+		productResp.FileThumbnailURI = file.FileThumbnailURI
 	}
+
+	log.Printf("[CreateProduct] Product created successfully with ID: %s", productResp.ProductID)
 
 	return productResp, nil
 }

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"net/http"
 	"reflect"
@@ -112,7 +113,7 @@ func (h *ProductHandler) GetAllProducts(c *fiber.Ctx) error {
 func (h *ProductHandler) CreateProduct(c *fiber.Ctx) error {
 	var req models.ProductRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid JSON payload",
 		})
 	}
@@ -148,7 +149,7 @@ func (h *ProductHandler) CreateProduct(c *fiber.Ctx) error {
 				details = append(details, fieldName+" is not valid")
 			}
 		}
-		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": details,
 		})
 	}
@@ -169,30 +170,31 @@ func (h *ProductHandler) CreateProduct(c *fiber.Ctx) error {
 
 	req.UserID = userID
 
-	// req.UserID = uuid.MustParse("11111111-1111-1111-1111-111111111111") // UUID dummy valid
-
 	productResp, err := h.productService.CreateProduct(c.Context(), req)
 	if err != nil {
-		switch err.Error() {
-		case "sku already exists":
-			return c.Status(http.StatusConflict).JSON(fiber.Map{
+		switch {
+		case errors.Is(err, sql.ErrNoRows): // This should not happen here
+			// Ignore; handled above
+		case strings.Contains(err.Error(), "sku already exists"):
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
 				"error": "sku already exists",
 			})
-		case "user not found or invalid token":
-			return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+		case strings.Contains(err.Error(), "file not found"):
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "fileId is not valid or does not exist",
+			})
+		case strings.Contains(err.Error(), "user not found or invalid token"):
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "Invalid or expired token",
 			})
-		case "file not found":
-			return c.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": "fileId is not valid / exists",
-			})
 		default:
-			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
-				"error": err.Error(),
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "internal server error",
 			})
 		}
 	}
-	return c.Status(http.StatusCreated).JSON(productResp)
+
+	return c.Status(fiber.StatusCreated).JSON(productResp)
 }
 
 func getJSONTagName(fieldPath string) string {

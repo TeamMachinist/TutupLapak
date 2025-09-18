@@ -46,10 +46,10 @@ SELECT id, sender_name, sender_contact_type, sender_contact_detail,
        purchased_items, payment_details, total_price, status,
        created_at, updated_at
 FROM purchases
-WHERE id = $1::text
+WHERE id = $1::uuid
 `
 
-func (q *Queries) GetPurchaseByID(ctx context.Context, purchaseid string) (Purchases, error) {
+func (q *Queries) GetPurchaseByID(ctx context.Context, purchaseid uuid.UUID) (Purchases, error) {
 	row := q.db.QueryRow(ctx, getPurchaseByID, purchaseid)
 	var i Purchases
 	err := row.Scan(
@@ -69,14 +69,14 @@ func (q *Queries) GetPurchaseByID(ctx context.Context, purchaseid string) (Purch
 
 const updatePurchaseStatus = `-- name: UpdatePurchaseStatus :exec
 UPDATE purchases
-SET status = $1::text,
+SET status = $1::purchase_status,
     updated_at = NOW()
-WHERE id = $2::text
+WHERE id = $2::uuid
 `
 
 type UpdatePurchaseStatusParams struct {
-	Status     string `json:"status"`
-	Purchaseid string `json:"purchaseid"`
+	Status     PurchaseStatus `json:"status"`
+	Purchaseid uuid.UUID      `json:"purchaseid"`
 }
 
 func (q *Queries) UpdatePurchaseStatus(ctx context.Context, arg UpdatePurchaseStatusParams) error {

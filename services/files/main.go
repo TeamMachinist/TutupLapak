@@ -183,7 +183,7 @@ func setupRoutes(services Services, deps Dependencies) *chi.Mux {
 	r.Get("/healthz", healthHandler(deps.DB, deps.RedisCache))
 
 	// Pragmatically no auth for now, to ease fetch by core service (purchase)
-	r.Get("/api/v1/file", services.FileHandler.GetFile)
+	r.Get("/api/v1/file/{fileId}", services.FileHandler.GetFile)
 	r.Get("/api/v1/file", services.FileHandler.GetFiles)
 
 	// API routes with authentication

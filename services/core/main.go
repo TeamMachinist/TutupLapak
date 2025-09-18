@@ -68,7 +68,7 @@ func main() {
 	fileClient := clients.NewFileClient(cfg.App.FileUrl)
 
 	productRepo := repositories.NewProductRepository(database.Queries)
-	purchaseRepo := repositories.NewPurchaseRepository(database.Pool)
+	purchaseRepo := repositories.NewPurchaseRepository(database.Pool, database.Queries)
 	userRepo := repositories.NewUserRepository(database.Queries)
 
 	productService := services.NewProductService(productRepo, fileClient, redisClient)

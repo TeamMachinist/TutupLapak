@@ -5,9 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	// "github.com/teammachinist/tutuplapak/clients"
 	"github.com/google/uuid"
+	"github.com/teammachinist/tutuplapak/internal/database"
 	"github.com/teammachinist/tutuplapak/services/core/clients"
 	"github.com/teammachinist/tutuplapak/services/core/models"
 	"github.com/teammachinist/tutuplapak/services/core/repositories"
@@ -48,7 +50,6 @@ func (s *PurchaseService) CreatePurchase(ctx context.Context, req models.Purchas
 
 // UploadPaymentProof implements PurchaseServiceInterface.
 func (s *PurchaseService) UploadPaymentProof(ctx context.Context, purchaseId string, req []string) error {
-
 	// Ambil purchase by ID
 	purchase, err := s.purchaseRepo.GetPurchaseByid(ctx, purchaseId)
 	if err != nil {
@@ -59,7 +60,7 @@ func (s *PurchaseService) UploadPaymentProof(ctx context.Context, purchaseId str
 	}
 
 	// Validasi status unpaid
-	if purchase.Status != "unpaid" {
+	if purchase.Status != models.PurchaseStatus(database.PurchaseStatusUnpaid) {
 		return errors.New("purchase is not in unpaid status")
 	}
 
@@ -71,6 +72,9 @@ func (s *PurchaseService) UploadPaymentProof(ctx context.Context, purchaseId str
 	// Validasi file IDs
 	_, err = s.fileClient.GetFilesByIDList(ctx, req)
 	if err != nil {
+		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "invalid") {
+			return fmt.Errorf("invalid or non-existent file IDs")
+		}
 		return fmt.Errorf("failed to validate file IDs: %w", err)
 	}
 
@@ -83,7 +87,7 @@ func (s *PurchaseService) UploadPaymentProof(ctx context.Context, purchaseId str
 	}
 
 	// Update status jadi paid
-	err = s.purchaseRepo.UpdatePurchaseStatus(ctx, purchaseId, "paid")
+	err = s.purchaseRepo.UpdatePurchaseStatus(ctx, purchaseId, database.PurchaseStatusPaid)
 	if err != nil {
 		return fmt.Errorf("failed to update purchase status: %w", err)
 	}

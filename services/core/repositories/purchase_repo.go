@@ -17,7 +17,7 @@ import (
 type PurchaseRepositoryInterface interface {
 	CreatePurchase(ctx context.Context, req models.PurchaseRequest) (models.PurchaseResponse, error)
 	GetPurchaseByid(ctx context.Context, purchaseId string) (models.PurchaseResponse, error)
-	UpdatePurchaseStatus(ctx context.Context, purchaseId string, newStatus string) error
+	UpdatePurchaseStatus(ctx context.Context, purchaseId string, newStatus database.PurchaseStatus) error
 }
 
 type PurchaseRepository struct {
@@ -27,7 +27,12 @@ type PurchaseRepository struct {
 
 // GetPurchaseByid implements PurchaseRepositoryInterface.
 func (r *PurchaseRepository) GetPurchaseByid(ctx context.Context, purchaseId string) (models.PurchaseResponse, error) {
-	row, err := r.dbSqlc.GetPurchaseByID(ctx, purchaseId)
+	parsedId, err := uuid.Parse(purchaseId)
+	if err != nil {
+		return models.PurchaseResponse{}, err
+	}
+
+	row, err := r.dbSqlc.GetPurchaseByID(ctx, parsedId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return models.PurchaseResponse{}, nil
@@ -57,9 +62,14 @@ func (r *PurchaseRepository) GetPurchaseByid(ctx context.Context, purchaseId str
 }
 
 // UpdatePurchaseStatus implements PurchaseRepositoryInterface.
-func (r *PurchaseRepository) UpdatePurchaseStatus(ctx context.Context, purchaseId string, newStatus string) error {
+func (r *PurchaseRepository) UpdatePurchaseStatus(ctx context.Context, purchaseId string, newStatus database.PurchaseStatus) error {
+	parsedId, err := uuid.Parse(purchaseId)
+	if err != nil {
+		return err
+	}
+
 	return r.dbSqlc.UpdatePurchaseStatus(ctx, database.UpdatePurchaseStatusParams{
-		Purchaseid: purchaseId,
+		Purchaseid: parsedId,
 		Status:     newStatus,
 	})
 }
@@ -228,6 +238,6 @@ func (r *PurchaseRepository) CreatePurchase(ctx context.Context, req models.Purc
 	}, nil
 }
 
-func NewPurchaseRepository(db *pgxpool.Pool) PurchaseRepositoryInterface {
-	return &PurchaseRepository{db: db}
+func NewPurchaseRepository(db *pgxpool.Pool, dbSqlc database.Querier) PurchaseRepositoryInterface {
+	return &PurchaseRepository{db: db, dbSqlc: dbSqlc}
 }

@@ -338,12 +338,12 @@ func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) (U
 const updateProductQty = `-- name: UpdateProductQty :execrows
 UPDATE products
 SET qty = qty - $1::int
-WHERE id = $2::text AND qty >= $1::int
+WHERE id = $2::uuid AND qty >= $1::int
 `
 
 type UpdateProductQtyParams struct {
-	Qty int    `json:"qty"`
-	ID  string `json:"id"`
+	Qty int       `json:"qty"`
+	ID  uuid.UUID `json:"id"`
 }
 
 func (q *Queries) UpdateProductQty(ctx context.Context, arg UpdateProductQtyParams) (int64, error) {

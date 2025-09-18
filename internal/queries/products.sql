@@ -84,7 +84,7 @@ WHERE id = @id::uuid AND user_id = @user_id::uuid;
 -- name: UpdateProductQty :execrows
 UPDATE products
 SET qty = qty - @qty::int
-WHERE id = @id::text AND qty >= @qty::int;
+WHERE id = @id::uuid AND qty >= @qty::int;
 
 -- name: GetProductByID :one
 SELECT 
