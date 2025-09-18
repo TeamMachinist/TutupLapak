@@ -81,3 +81,34 @@ func (h *PurchaseHandler) CreatePurchase(c *fiber.Ctx) error {
 
 	return c.Status(http.StatusCreated).JSON(resp)
 }
+
+func (h *PurchaseHandler) UploadPaymentProof(c *fiber.Ctx) error {
+	purchaseId := c.Params("purchaseId") // string
+
+	var body struct {
+		FileIds []string `json:"fileIds" validate:"required,min=1,dive,uuid4"`
+	}
+
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid request body",
+		})
+	}
+
+	if len(body.FileIds) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "fileIds must not be empty",
+		})
+	}
+
+	err := h.purchaseService.UploadPaymentProof(c.Context(), purchaseId, body.FileIds)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "payment proof processed successfully, purchase marked as paid and stock reduced",
+	})
+}

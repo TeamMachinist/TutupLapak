@@ -40,3 +40,46 @@ func (q *Queries) CreatePurchase(ctx context.Context, arg CreatePurchaseParams) 
 	)
 	return err
 }
+
+const getPurchaseByID = `-- name: GetPurchaseByID :one
+SELECT id, sender_name, sender_contact_type, sender_contact_detail,
+       purchased_items, payment_details, total_price, status,
+       created_at, updated_at
+FROM purchases
+WHERE id = $1::text
+`
+
+func (q *Queries) GetPurchaseByID(ctx context.Context, purchaseid string) (Purchases, error) {
+	row := q.db.QueryRow(ctx, getPurchaseByID, purchaseid)
+	var i Purchases
+	err := row.Scan(
+		&i.ID,
+		&i.SenderName,
+		&i.SenderContactType,
+		&i.SenderContactDetail,
+		&i.PurchasedItems,
+		&i.PaymentDetails,
+		&i.TotalPrice,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updatePurchaseStatus = `-- name: UpdatePurchaseStatus :exec
+UPDATE purchases
+SET status = $1::text,
+    updated_at = NOW()
+WHERE id = $2::text
+`
+
+type UpdatePurchaseStatusParams struct {
+	Status     string `json:"status"`
+	Purchaseid string `json:"purchaseid"`
+}
+
+func (q *Queries) UpdatePurchaseStatus(ctx context.Context, arg UpdatePurchaseStatusParams) error {
+	_, err := q.db.Exec(ctx, updatePurchaseStatus, arg.Status, arg.Purchaseid)
+	return err
+}

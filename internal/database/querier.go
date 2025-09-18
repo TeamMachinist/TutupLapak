@@ -29,6 +29,7 @@ type Querier interface {
 	GetFilesByID(ctx context.Context, dollar_1 []uuid.UUID) ([]GetFilesByIDRow, error)
 	GetFilesByUser(ctx context.Context, userID uuid.UUID) ([]Files, error)
 	GetProductByID(ctx context.Context, id uuid.UUID) (GetProductByIDRow, error)
+	GetPurchaseByID(ctx context.Context, purchaseid string) (Purchases, error)
 	GetUserAuthByEmail(ctx context.Context, email string) (GetUserAuthByEmailRow, error)
 	GetUserAuthByID(ctx context.Context, id uuid.UUID) (GetUserAuthByIDRow, error)
 	GetUserAuthByPhone(ctx context.Context, phone string) (GetUserAuthByPhoneRow, error)
@@ -40,6 +41,7 @@ type Querier interface {
 	RegisterWithEmail(ctx context.Context, arg RegisterWithEmailParams) (RegisterWithEmailRow, error)
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (UpdateProductRow, error)
 	UpdateProductQty(ctx context.Context, arg UpdateProductQtyParams) (int64, error)
+	UpdatePurchaseStatus(ctx context.Context, arg UpdatePurchaseStatusParams) error
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (Users, error)
 	UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams) (Users, error)
 	UpdateUserPhone(ctx context.Context, arg UpdateUserPhoneParams) (Users, error)

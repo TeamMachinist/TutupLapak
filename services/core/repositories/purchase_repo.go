@@ -3,6 +3,7 @@ package repositories
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"time"
@@ -15,14 +16,52 @@ import (
 
 type PurchaseRepositoryInterface interface {
 	CreatePurchase(ctx context.Context, req models.PurchaseRequest) (models.PurchaseResponse, error)
+	GetPurchaseByid(ctx context.Context, purchaseId string) (models.PurchaseResponse, error)
+	UpdatePurchaseStatus(ctx context.Context, purchaseId string, newStatus string) error
 }
 
 type PurchaseRepository struct {
-	db *pgxpool.Pool
+	db     *pgxpool.Pool
+	dbSqlc database.Querier
 }
 
-func NewPurchaseRepository(db *pgxpool.Pool) PurchaseRepositoryInterface {
-	return &PurchaseRepository{db: db}
+// GetPurchaseByid implements PurchaseRepositoryInterface.
+func (r *PurchaseRepository) GetPurchaseByid(ctx context.Context, purchaseId string) (models.PurchaseResponse, error) {
+	row, err := r.dbSqlc.GetPurchaseByID(ctx, purchaseId)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.PurchaseResponse{}, nil
+		}
+		return models.PurchaseResponse{}, err
+	}
+
+	var paymentDetails []models.PaymentDetail
+	if err := json.Unmarshal(row.PaymentDetails, &paymentDetails); err != nil {
+		return models.PurchaseResponse{}, err
+	}
+
+	var purchasedItems []models.ProductResponse
+	if err := json.Unmarshal(row.PurchasedItems, &purchasedItems); err != nil {
+		return models.PurchaseResponse{}, err
+	}
+
+	return models.PurchaseResponse{
+		PurchaseID:     row.ID,
+		PurchasedItems: purchasedItems,
+		TotalPrice:     row.TotalPrice,
+		PaymentDetails: paymentDetails,
+		CreatedAt:      row.CreatedAt,
+		UpdatedAt:      row.UpdatedAt,
+		Status:         models.PurchaseStatus(row.Status),
+	}, nil
+}
+
+// UpdatePurchaseStatus implements PurchaseRepositoryInterface.
+func (r *PurchaseRepository) UpdatePurchaseStatus(ctx context.Context, purchaseId string, newStatus string) error {
+	return r.dbSqlc.UpdatePurchaseStatus(ctx, database.UpdatePurchaseStatusParams{
+		Purchaseid: purchaseId,
+		Status:     newStatus,
+	})
 }
 
 func (r *PurchaseRepository) CreatePurchase(ctx context.Context, req models.PurchaseRequest) (models.PurchaseResponse, error) {
@@ -187,4 +226,8 @@ func (r *PurchaseRepository) CreatePurchase(ctx context.Context, req models.Purc
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}, nil
+}
+
+func NewPurchaseRepository(db *pgxpool.Pool) PurchaseRepositoryInterface {
+	return &PurchaseRepository{db: db}
 }

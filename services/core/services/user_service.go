@@ -54,7 +54,7 @@ func (s *UserService) LinkPhone(ctx context.Context, userID uuid.UUID, phone str
 	// Get file data if fileID exists
 	var fileURI, fileThumbnailURI string
 	if user.FileID.Valid {
-		file, err := s.fileClient.GetFileByID(ctx, uuid.UUID(user.FileID.Bytes), userID.String())
+		file, err := s.fileClient.GetFileByID(ctx, uuid.UUID(user.FileID.Bytes))
 		if err == nil {
 			fileURI = file.FileURI
 			fileThumbnailURI = file.FileThumbnailURI

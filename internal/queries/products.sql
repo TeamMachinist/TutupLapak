@@ -80,10 +80,11 @@ SELECT EXISTS(
 DELETE FROM products
 WHERE id = @id::uuid AND user_id = @user_id::uuid;
 
+
 -- name: UpdateProductQty :execrows
-UPDATE products 
-SET qty = qty - $2 
-WHERE id = $1;
+UPDATE products
+SET qty = qty - @qty::int
+WHERE id = @id::text AND qty >= @qty::int;
 
 -- name: GetProductByID :one
 SELECT 

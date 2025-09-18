@@ -72,7 +72,7 @@ func main() {
 	userRepo := repositories.NewUserRepository(database.Queries)
 
 	productService := services.NewProductService(productRepo, fileClient, redisClient)
-	purchaseService := services.NewPurchaseService(purchaseRepo, fileClient)
+	purchaseService := services.NewPurchaseService(purchaseRepo, productRepo, fileClient)
 	userService := services.NewUserService(userRepo, fileClient)
 
 	productHandler := handlers.NewProductHandler(productService)
@@ -98,6 +98,7 @@ func main() {
 	purchase := api.Group("/purchase")
 	{
 		purchase.Post("", purchaseHandler.CreatePurchase)
+		purchase.Post("/:purchaseId", purchaseHandler.UploadPaymentProof)
 	}
 
 	c := make(chan os.Signal, 1)

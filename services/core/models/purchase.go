@@ -39,6 +39,7 @@ type PurchaseResponse struct {
 	PaymentDetails []PaymentDetail   `json:"paymentDetails" db:"payment_details"`
 	CreatedAt      time.Time         `json:"createdAt" db:"created_at"`
 	UpdatedAt      time.Time         `json:"updatedAt" db:"updated_at"`
+	Status         PurchaseStatus    `json:"-" db:"status"`
 }
 
 type PaymentDetail struct {
@@ -47,3 +48,10 @@ type PaymentDetail struct {
 	BankAccountNumber string `json:"bankAccountNumber" db:"bank_account_number"`
 	TotalPrice        int    `json:"totalPrice" db:"total_price"`
 }
+
+type PurchaseStatus string
+
+const (
+	PurchaseStatusUnpaid PurchaseStatus = "unpaid"
+	PurchaseStatusPaid   PurchaseStatus = "paid"
+)
