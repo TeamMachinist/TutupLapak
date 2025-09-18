@@ -14,6 +14,7 @@ import (
 
 type UserServiceInterface interface {
 	LinkPhone(ctx context.Context, userID uuid.UUID, phone string) (*models.LinkPhoneResponse, error)
+	LinkEmail(ctx context.Context, userID uuid.UUID, email string) (*models.LinkEmailResponse, error)
 }
 
 type UserService struct {
@@ -54,7 +55,7 @@ func (s *UserService) LinkPhone(ctx context.Context, userID uuid.UUID, phone str
 	// Get file data if fileID exists
 	var fileURI, fileThumbnailURI string
 	if user.FileID.Valid {
-		file, err := s.fileClient.GetFileByID(ctx, uuid.UUID(user.FileID.Bytes), userID.String())
+		file, err := s.fileClient.GetFileByID(ctx, uuid.UUID(user.FileID.Bytes))
 		if err == nil {
 			fileURI = file.FileURI
 			fileThumbnailURI = file.FileThumbnailURI
@@ -63,6 +64,74 @@ func (s *UserService) LinkPhone(ctx context.Context, userID uuid.UUID, phone str
 
 	// Build response
 	response := &models.LinkPhoneResponse{
+		FileID:            "",
+		FileURI:           fileURI,
+		FileThumbnailURI:  fileThumbnailURI,
+		BankAccountName:   "",
+		BankAccountHolder: "",
+		BankAccountNumber: "",
+	}
+
+	if user.Email != "" {
+		response.Email = user.Email
+	}
+
+	if user.Phone != "" {
+		response.Phone = user.Phone
+	}
+
+	if user.BankAccountName != "" {
+		response.BankAccountName = user.BankAccountName
+	}
+	if user.BankAccountHolder != "" {
+		response.BankAccountHolder = user.BankAccountHolder
+	}
+	if user.BankAccountNumber != "" {
+		response.BankAccountNumber = user.BankAccountNumber
+	}
+
+	if user.FileID.Valid {
+		response.FileID = uuid.UUID(user.FileID.Bytes).String()
+	}
+
+	return response, nil
+}
+
+func (s *UserService) LinkEmail(ctx context.Context, userID uuid.UUID, email string) (*models.LinkEmailResponse, error) {
+	if err := s.validateEmail(email); err != nil {
+		return nil, err
+	}
+
+	exists, err := s.userRepo.CheckEmailExists(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return nil, errors.New("email is taken")
+	}
+
+	err = s.userRepo.UpdateUserEmail(ctx, userID, email)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := s.userRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get file data if fileID exists
+	var fileURI, fileThumbnailURI string
+	if user.FileID.Valid {
+		file, err := s.fileClient.GetFileByID(ctx, uuid.UUID(user.FileID.Bytes))
+		if err == nil {
+			fileURI = file.FileURI
+			fileThumbnailURI = file.FileThumbnailURI
+		}
+	}
+
+	// Build response
+	response := &models.LinkEmailResponse{
 		FileID:            "",
 		FileURI:           fileURI,
 		FileThumbnailURI:  fileThumbnailURI,
@@ -108,6 +177,20 @@ func (s *UserService) validatePhone(phone string) error {
 	phoneRegex := regexp.MustCompile(`^\+[1-9]\d{1,14}$`)
 	if !phoneRegex.MatchString(phone) {
 		return errors.New("invalid phone number format")
+	}
+
+	return nil
+}
+
+func (s *UserService) validateEmail(email string) error {
+	if email == "" {
+		return errors.New("email is required")
+	}
+
+	// Basic email validation regex
+	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
+	if !emailRegex.MatchString(email) {
+		return errors.New("invalid email format")
 	}
 
 	return nil

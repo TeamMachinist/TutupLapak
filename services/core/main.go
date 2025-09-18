@@ -93,6 +93,7 @@ func main() {
 	user := api.Group("/user")
 	{
 		user.Post("/link/phone", jwtService.FiberMiddleware(), userHandler.LinkPhone)
+		user.Post("/link/email", jwtService.FiberMiddleware(), userHandler.LinkEmail)
 	}
 
 	purchase := api.Group("/purchase")

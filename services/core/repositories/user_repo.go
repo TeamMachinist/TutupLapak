@@ -38,3 +38,19 @@ func (r *UserRepository) CheckPhoneExists(ctx context.Context, phone string) (bo
 	}
 	return result, nil
 }
+
+func (r *UserRepository) CheckEmailExists(ctx context.Context, email string) (bool, error) {
+	result, err := r.db.CheckEmailExists(ctx, email)
+	if err != nil {
+		return false, err
+	}
+	return result, nil
+}
+
+func (r *UserRepository) UpdateUserEmail(ctx context.Context, userID uuid.UUID, email string) error {
+	_, err := r.db.UpdateUserEmail(ctx, database.UpdateUserEmailParams{
+		ID:    userID,
+		Email: email,
+	})
+	return err
+}
