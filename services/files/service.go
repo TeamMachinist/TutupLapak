@@ -140,7 +140,7 @@ func (s FileService) GetFile(ctx context.Context, fileID uuid.UUID) (File, error
 	return file, nil
 }
 
-func (s FileService) GetFiles(ctx context.Context, fileID []uuid.UUID) ([]database.GetFilesByIDRow, error) {
+func (s FileService) GetFiles(ctx context.Context, fileID []uuid.UUID) ([]database.Files, error) {
 	logger.DebugCtx(ctx, "Getting file", "file_id", fileID)
 
 	files, err := s.queries.GetFilesByID(ctx, fileID)
