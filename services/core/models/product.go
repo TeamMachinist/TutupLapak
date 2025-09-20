@@ -23,7 +23,7 @@ type Product struct {
 
 type ProductRequest struct {
 	Name     string    `json:"name" validate:"required,min=4,max=32"`
-	Category string    `json:"category" validate:"required"`
+	Category string    `json:"category" validate:"required,category_enum"`
 	Qty      int       `json:"qty" validate:"required,min=1"`
 	Price    int       `json:"price" validate:"required,min=100"`
 	SKU      string    `json:"sku" validate:"required,max=32"`
