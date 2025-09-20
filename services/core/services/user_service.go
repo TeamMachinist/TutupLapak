@@ -147,7 +147,6 @@ func (s *UserService) LinkEmail(ctx context.Context, userID uuid.UUID, email str
 			}
 		}
 	}
-	fmt.Printf("error apa nih: %s", err)
 
 	// Build response
 	response := &models.LinkEmailResponse{
@@ -204,7 +203,6 @@ func (s *UserService) validatePhone(phone string) error {
 }
 
 func (s *UserService) GetUserWithFileId(ctx context.Context, userID uuid.UUID) (models.UserResponse, error) {
-	fmt.Printf("masuk service: %s", userID.String())
 	var userFile models.UserResponse
 	if err := s.cache.Get(ctx, fmt.Sprintf(cache.UserFileListKey, userID.String()), &userFile); err == nil {
 		return models.UserResponse{
@@ -219,32 +217,38 @@ func (s *UserService) GetUserWithFileId(ctx context.Context, userID uuid.UUID) (
 		}, nil
 	}
 
-	// TODO: Pisah query
 	rows, err := s.userRepo.GetUserByID(ctx, userID)
 	if err != nil {
 		return models.UserResponse{}, errors.New("user does not exist")
 	}
 
-	// // TODO: Handle if user has no fileID
-	// var file *clients.FileMetadataResponse
-	// if err := s.cache.Get(ctx, cache.FileMetadataKey, file); err != nil {
-	// 	clientFile, err := s.fileClient.GetFileByID(ctx, *rows.FileID)
-	// 	if err != nil {
-	// 		return models.UserResponse{}, err
-	// 	}
-	// 	file = clientFile
-	// }
+	fileID := ""
+	fileURI := ""
+	fileThumbnailURI := ""
+
+	if rows.FileID != nil {
+		var file *clients.FileMetadataResponse
+		if err := s.cache.Get(ctx, cache.FileMetadataKey, file); err != nil {
+			clientFile, err := s.fileClient.GetFileByID(ctx, *rows.FileID)
+			if err != nil {
+				return models.UserResponse{}, err
+			}
+			file = clientFile
+		}
+		fileID = file.ID.String()
+		fileURI = file.FileURI
+		fileThumbnailURI = file.FileThumbnailURI
+	}
 
 	resp := models.UserResponse{
 		Email:             rows.Email,
 		Phone:             rows.Phone,
+		FileID:            fileID,
+		URI:               fileURI,
+		ThumbnailURI:      fileThumbnailURI,
 		BankAccountName:   rows.BankAccountName,
 		BankAccountHolder: rows.BankAccountHolder,
 		BankAccountNumber: rows.BankAccountNumber,
-		// TODO: Handle if user has no fileID
-		// FileID:            rows.FileID.String(),
-		// URI:               file.FileURI,
-		// ThumbnailURI:      file.FileThumbnailURI,
 	}
 	if err = s.cache.Set(ctx, fmt.Sprintf(cache.UserFileListKey, userID.String()), resp, cache.FileListTTL); err != nil {
 		fmt.Printf("[UserFileList] Failed to set cache: %v", err)
@@ -277,29 +281,20 @@ func (s *UserService) UpdateUser(ctx context.Context,
 			}
 		}
 	}
-	// if err := s.cache.Get(ctx, cacheKey, &cachedFile); err == nil {
-	// 	logger.DebugCtx(ctx, "File retrieved from cache", "file_id", fileID)
-	// 	return cachedFile, nil
-	// }
 
 	// check exist & ownership
 	if req.FileID != nil && *req.FileID != "" && *req.FileID != uuid.Nil.String() {
 		// Check file exist
 		var file *clients.FileMetadataResponse
-		fmt.Printf("masuk sini")
 		if err := s.cache.Get(ctx, cache.FileMetadataKey, file); err != nil {
-			fmt.Printf("masuk error cache")
 			clientFile, err := s.fileClient.GetFileByID(ctx, *fileUUID)
 			if err != nil {
-				fmt.Printf("masuk error client: %s", err)
 				return models.UserResponse{}, err
 			}
 			file = clientFile
 		}
 
 		// Check Ownership
-		fmt.Printf("userId.String: %s", userID.String())
-		fmt.Printf("file.UserID: %s", file.UserID)
 		if userID.String() != file.UserID {
 			return models.UserResponse{}, errors.New("unauthorized: you don't own this file")
 		}
