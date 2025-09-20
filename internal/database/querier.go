@@ -27,7 +27,7 @@ type Querier interface {
 	GetAllProducts(ctx context.Context, arg GetAllProductsParams) ([]GetAllProductsRow, error)
 	GetFile(ctx context.Context, id uuid.UUID) (Files, error)
 	GetFileByIDAndUserID(ctx context.Context, arg GetFileByIDAndUserIDParams) (Files, error)
-	GetFilesByID(ctx context.Context, dollar_1 []uuid.UUID) ([]GetFilesByIDRow, error)
+	GetFilesByID(ctx context.Context, dollar_1 []uuid.UUID) ([]Files, error)
 	GetFilesByUser(ctx context.Context, userID uuid.UUID) ([]Files, error)
 	GetProductByID(ctx context.Context, id uuid.UUID) (GetProductByIDRow, error)
 	GetPurchaseByID(ctx context.Context, purchaseid uuid.UUID) (Purchases, error)

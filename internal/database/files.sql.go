@@ -93,25 +93,25 @@ func (q *Queries) GetFileByIDAndUserID(ctx context.Context, arg GetFileByIDAndUs
 }
 
 const getFilesByID = `-- name: GetFilesByID :many
-SELECT id, file_uri, file_thumbnail_uri FROM files WHERE id = ANY($1::uuid[])
+SELECT id, user_id, file_uri, file_thumbnail_uri, created_at FROM files WHERE id = ANY($1::uuid[])
 `
 
-type GetFilesByIDRow struct {
-	ID               uuid.UUID `json:"id"`
-	FileUri          string    `json:"file_uri"`
-	FileThumbnailUri string    `json:"file_thumbnail_uri"`
-}
-
-func (q *Queries) GetFilesByID(ctx context.Context, dollar_1 []uuid.UUID) ([]GetFilesByIDRow, error) {
+func (q *Queries) GetFilesByID(ctx context.Context, dollar_1 []uuid.UUID) ([]Files, error) {
 	rows, err := q.db.Query(ctx, getFilesByID, dollar_1)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []GetFilesByIDRow{}
+	items := []Files{}
 	for rows.Next() {
-		var i GetFilesByIDRow
-		if err := rows.Scan(&i.ID, &i.FileUri, &i.FileThumbnailUri); err != nil {
+		var i Files
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FileUri,
+			&i.FileThumbnailUri,
+			&i.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

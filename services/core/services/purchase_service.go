@@ -60,7 +60,7 @@ func (s *PurchaseService) UploadPaymentProof(ctx context.Context, purchaseId str
 
 	// Validasi status unpaid
 	if purchase.Status != models.PurchaseStatus(database.PurchaseStatusUnpaid) {
-		return errors.New("purchase is not in unpaid status")
+		return errors.New("purchase is already paid")
 	}
 
 	// Validasi jumlah file IDs == jumlah payment details

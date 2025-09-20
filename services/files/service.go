@@ -142,8 +142,9 @@ func (s FileService) GetFile(ctx context.Context, fileID uuid.UUID) (File, error
 
 func (s FileService) GetFiles(ctx context.Context, fileID []uuid.UUID) ([]database.GetFilesByIDRow, error) {
 	logger.DebugCtx(ctx, "Getting file", "file_id", fileID)
-	file, err := s.queries.GetFilesByID(ctx, fileID)
-	logger.Info("file id", file)
+
+	files, err := s.queries.GetFilesByID(ctx, fileID)
+	logger.Info("file id", fileID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			logger.WarnCtx(ctx, "File not found", "file_id", fileID)
@@ -152,9 +153,30 @@ func (s FileService) GetFiles(ctx context.Context, fileID []uuid.UUID) ([]databa
 		logger.ErrorCtx(ctx, "Failed to get file from database", "error", err, "file_id", fileID)
 		return nil, fmt.Errorf("failed to get file: %w", err)
 	}
-	return file, nil
-}
 
+	// Cache the file metadata
+	cacheData := map[string]interface{}{}
+	for _, f := range files {
+		key := fmt.Sprintf(cache.FileMetadataKey, f.ID.String())
+		cacheData[key] = File{
+			ID:               f.ID,
+			UserID:           f.UserID,
+			FileURI:          f.FileUri,
+			FileThumbnailURI: f.FileThumbnailUri,
+			CreatedAt:        f.CreatedAt,
+		}
+	}
+
+	if err := s.cache.SetMultiple(ctx, cacheData, cache.FileMetadataTTL); err != nil {
+		logger.WarnCtx(ctx, "Failed to cache file metadata",
+			"error", err,
+			"file_id", fileID,
+			"cache_key", cacheData,
+		)
+	}
+
+	return files, nil
+}
 
 func (s FileService) DeleteFiles(ctx context.Context, fileID uuid.UUID, userID string) error {
 	logger.InfoCtx(ctx, "Deleting file", "file_id", fileID, "user_id", userID)

@@ -225,24 +225,26 @@ func (s *UserService) GetUserWithFileId(ctx context.Context, userID uuid.UUID) (
 		return models.UserResponse{}, errors.New("user does not exist")
 	}
 
-	var file *clients.FileMetadataResponse
-	if err := s.cache.Get(ctx, cache.FileMetadataKey, file); err != nil {
-		clientFile, err := s.fileClient.GetFileByID(ctx, *rows.FileID)
-		if err != nil {
-			return models.UserResponse{}, err
-		}
-		file = clientFile
-	}
+	// // TODO: Handle if user has no fileID
+	// var file *clients.FileMetadataResponse
+	// if err := s.cache.Get(ctx, cache.FileMetadataKey, file); err != nil {
+	// 	clientFile, err := s.fileClient.GetFileByID(ctx, *rows.FileID)
+	// 	if err != nil {
+	// 		return models.UserResponse{}, err
+	// 	}
+	// 	file = clientFile
+	// }
 
 	resp := models.UserResponse{
 		Email:             rows.Email,
 		Phone:             rows.Phone,
-		FileID:            rows.FileID.String(),
-		URI:               file.FileURI,
-		ThumbnailURI:      file.FileThumbnailURI,
 		BankAccountName:   rows.BankAccountName,
 		BankAccountHolder: rows.BankAccountHolder,
 		BankAccountNumber: rows.BankAccountNumber,
+		// TODO: Handle if user has no fileID
+		// FileID:            rows.FileID.String(),
+		// URI:               file.FileURI,
+		// ThumbnailURI:      file.FileThumbnailURI,
 	}
 	if err = s.cache.Set(ctx, fmt.Sprintf(cache.UserFileListKey, userID.String()), resp, cache.FileListTTL); err != nil {
 		fmt.Printf("[UserFileList] Failed to set cache: %v", err)

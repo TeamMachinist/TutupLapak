@@ -158,7 +158,7 @@ WHERE
     AND p.category = COALESCE(NULLIF($3::text, ''), p.category)
 ORDER BY 
     CASE WHEN $4::text = 'newest' THEN GREATEST(p.created_at, p.updated_at) END DESC,
-    CASE WHEN $4::text = 'oldest' THEN GREATEST(p.created_at, p.updated_at) END ASC,
+    CASE WHEN $4::text = 'oldest' THEN LEAST(p.created_at, p.updated_at) END ASC,
     CASE WHEN $4::text = 'cheapest' THEN p.price END ASC,
     CASE WHEN $4::text = 'expensive' THEN p.price END DESC,
     p.created_at DESC

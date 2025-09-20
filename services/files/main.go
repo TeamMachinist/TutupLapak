@@ -175,7 +175,7 @@ func setupRoutes(services Services, deps Dependencies) *chi.Mux {
 	r.Use(middleware.Timeout(30 * time.Second))
 	r.Use(requestLoggerMiddleware)
 
-	// Static files
+	// Static files -> What does it serve?
 	fs := http.FileServer(http.Dir("static"))
 	r.Handle("/static/*", http.StripPrefix("/static/", fs))
 

@@ -241,12 +241,13 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 		})
 	}
 
-	if err := uuid.Validate(*req.FileID); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error":   "Validation error",
-			"details": "fileId is not valid",
-		})
-	}
+	// // TODO: fileID shouldn't be required
+	// if err := uuid.Validate(*req.FileID); err != nil {
+	// 	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+	// 		"error":   "Validation error",
+	// 		"details": "fileId is not valid",
+	// 	})
+	// }
 
 	validate := validator.New()
 	if err := validate.Struct(req); err != nil {

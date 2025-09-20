@@ -9,6 +9,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/teammachinist/tutuplapak/internal/logger"
 	"github.com/teammachinist/tutuplapak/services/core/models"
 	"github.com/teammachinist/tutuplapak/services/core/services"
 )
@@ -84,6 +85,9 @@ func (h *PurchaseHandler) CreatePurchase(c *fiber.Ctx) error {
 }
 
 func (h *PurchaseHandler) UploadPaymentProof(c *fiber.Ctx) error {
+	ctx := c.Context()
+	logger.InfoCtx(ctx, "Upload payment proof request")
+
 	purchaseId := c.Params("purchaseId")
 
 	var body struct {
@@ -106,7 +110,7 @@ func (h *PurchaseHandler) UploadPaymentProof(c *fiber.Ctx) error {
 	if err != nil {
 		// Handle error secara spesifik
 		if strings.Contains(err.Error(), "purchase not found") ||
-			strings.Contains(err.Error(), "purchase is not in unpaid status") ||
+			strings.Contains(err.Error(), "purchase is already paid") ||
 			strings.Contains(err.Error(), "expected") ||
 			strings.Contains(err.Error(), "invalid or non-existent file IDs") ||
 			strings.Contains(err.Error(), "invalid request body") {
@@ -114,6 +118,8 @@ func (h *PurchaseHandler) UploadPaymentProof(c *fiber.Ctx) error {
 				"error": err.Error(),
 			})
 		}
+
+		logger.ErrorCtx(ctx, "Failed to upload payment proof", "error", err)
 
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "internal server error",
