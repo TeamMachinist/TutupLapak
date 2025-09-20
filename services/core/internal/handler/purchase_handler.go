@@ -1,5 +1,5 @@
 // handlers/purchase.go
-package handlers
+package handler
 
 import (
 	"context"
@@ -7,23 +7,24 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/teammachinist/tutuplapak/services/core/internal/logger"
+	"github.com/teammachinist/tutuplapak/services/core/internal/model"
+	"github.com/teammachinist/tutuplapak/services/core/internal/service"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"github.com/teammachinist/tutuplapak/internal/logger"
-	"github.com/teammachinist/tutuplapak/services/core/models"
-	"github.com/teammachinist/tutuplapak/services/core/services"
 )
 
 type PurchaseHandler struct {
-	purchaseService services.PurchaseServiceInterface
+	purchaseService service.PurchaseServiceInterface
 }
 
-func NewPurchaseHandler(purchaseService services.PurchaseServiceInterface) *PurchaseHandler {
+func NewPurchaseHandler(purchaseService service.PurchaseServiceInterface) *PurchaseHandler {
 	return &PurchaseHandler{purchaseService: purchaseService}
 }
 
 func (h *PurchaseHandler) CreatePurchase(c *fiber.Ctx) error {
-	var req models.PurchaseRequest
+	var req model.PurchaseRequest
 
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "Invalid JSON"})

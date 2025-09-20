@@ -1,4 +1,4 @@
-package handlers
+package handler
 
 import (
 	"net/http"
@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/teammachinist/tutuplapak/internal"
-	"github.com/teammachinist/tutuplapak/services/core/models"
-	"github.com/teammachinist/tutuplapak/services/core/services"
+	"github.com/teammachinist/tutuplapak/services/core/internal/model"
+	"github.com/teammachinist/tutuplapak/services/core/internal/service"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
@@ -15,15 +15,15 @@ import (
 )
 
 type UserHandler struct {
-	userService services.UserServiceInterface
+	userService service.UserServiceInterface
 }
 
-func NewUserHandler(userService services.UserServiceInterface) *UserHandler {
+func NewUserHandler(userService service.UserServiceInterface) *UserHandler {
 	return &UserHandler{userService: userService}
 }
 
 func (h *UserHandler) LinkPhone(c *fiber.Ctx) error {
-	var req models.LinkPhoneRequest
+	var req model.LinkPhoneRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
@@ -67,6 +67,7 @@ func (h *UserHandler) LinkPhone(c *fiber.Ctx) error {
 	}
 
 	// Get user ID from JWT token (already validated by middleware)
+	// TODO: Use authz package
 	userIDStr, ok := internal.GetUserIDFromFiber(c)
 	if !ok {
 		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
@@ -108,7 +109,7 @@ func (h *UserHandler) LinkPhone(c *fiber.Ctx) error {
 }
 
 func (h *UserHandler) LinkEmail(c *fiber.Ctx) error {
-	var req models.LinkEmailRequest
+	var req model.LinkEmailRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
@@ -144,6 +145,7 @@ func (h *UserHandler) LinkEmail(c *fiber.Ctx) error {
 		})
 	}
 
+	// TODO: Use authz package
 	userIDStr, ok := internal.GetUserIDFromFiber(c)
 	if !ok {
 		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
@@ -184,6 +186,7 @@ func (h *UserHandler) LinkEmail(c *fiber.Ctx) error {
 }
 
 func (h *UserHandler) GetUserWithFileId(c *fiber.Ctx) error {
+	// TODO: Use authz package
 	userIDStr, ok := internal.GetUserIDFromFiber(c)
 	if !ok {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
@@ -218,6 +221,7 @@ func (h *UserHandler) GetUserWithFileId(c *fiber.Ctx) error {
 func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 	ctx := c.Context()
 
+	// TODO: Use authz package
 	userIDStr, ok := internal.GetUserIDFromFiber(c)
 	if !ok {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
@@ -232,7 +236,7 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 		})
 	}
 
-	req := models.UserRequest{}
+	req := model.UserRequest{}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": err.Error(),

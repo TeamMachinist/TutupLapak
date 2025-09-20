@@ -1,5 +1,4 @@
-// repositories/purchase.go
-package repositories
+package repository
 
 import (
 	"context"
@@ -8,15 +7,16 @@ import (
 	"errors"
 	"time"
 
+	"github.com/teammachinist/tutuplapak/services/core/internal/database"
+	"github.com/teammachinist/tutuplapak/services/core/internal/model"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/teammachinist/tutuplapak/internal/database"
-	"github.com/teammachinist/tutuplapak/services/core/models"
 )
 
 type PurchaseRepositoryInterface interface {
-	CreatePurchase(ctx context.Context, req models.PurchaseRequest) (models.PurchaseResponse, error)
-	GetPurchaseByid(ctx context.Context, purchaseId string) (models.PurchaseResponse, error)
+	CreatePurchase(ctx context.Context, req model.PurchaseRequest) (model.PurchaseResponse, error)
+	GetPurchaseByid(ctx context.Context, purchaseId string) (model.PurchaseResponse, error)
 	UpdatePurchaseStatus(ctx context.Context, purchaseId string, newStatus database.PurchaseStatus) error
 }
 
@@ -26,38 +26,38 @@ type PurchaseRepository struct {
 }
 
 // GetPurchaseByid implements PurchaseRepositoryInterface.
-func (r *PurchaseRepository) GetPurchaseByid(ctx context.Context, purchaseId string) (models.PurchaseResponse, error) {
+func (r *PurchaseRepository) GetPurchaseByid(ctx context.Context, purchaseId string) (model.PurchaseResponse, error) {
 	parsedId, err := uuid.Parse(purchaseId)
 	if err != nil {
-		return models.PurchaseResponse{}, err
+		return model.PurchaseResponse{}, err
 	}
 
 	row, err := r.dbSqlc.GetPurchaseByID(ctx, parsedId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return models.PurchaseResponse{}, nil
+			return model.PurchaseResponse{}, nil
 		}
-		return models.PurchaseResponse{}, err
+		return model.PurchaseResponse{}, err
 	}
 
-	var paymentDetails []models.PaymentDetail
+	var paymentDetails []model.PaymentDetail
 	if err := json.Unmarshal(row.PaymentDetails, &paymentDetails); err != nil {
-		return models.PurchaseResponse{}, err
+		return model.PurchaseResponse{}, err
 	}
 
-	var purchasedItems []models.ProductResponse
+	var purchasedItems []model.ProductResponse
 	if err := json.Unmarshal(row.PurchasedItems, &purchasedItems); err != nil {
-		return models.PurchaseResponse{}, err
+		return model.PurchaseResponse{}, err
 	}
 
-	return models.PurchaseResponse{
+	return model.PurchaseResponse{
 		PurchaseID:     row.ID,
 		PurchasedItems: purchasedItems,
 		TotalPrice:     row.TotalPrice,
 		PaymentDetails: paymentDetails,
 		CreatedAt:      row.CreatedAt,
 		UpdatedAt:      row.UpdatedAt,
-		Status:         models.PurchaseStatus(row.Status),
+		Status:         model.PurchaseStatus(row.Status),
 	}, nil
 }
 
@@ -74,10 +74,10 @@ func (r *PurchaseRepository) UpdatePurchaseStatus(ctx context.Context, purchaseI
 	})
 }
 
-func (r *PurchaseRepository) CreatePurchase(ctx context.Context, req models.PurchaseRequest) (models.PurchaseResponse, error) {
+func (r *PurchaseRepository) CreatePurchase(ctx context.Context, req model.PurchaseRequest) (model.PurchaseResponse, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return models.PurchaseResponse{}, err
+		return model.PurchaseResponse{}, err
 	}
 	defer tx.Rollback(ctx)
 
@@ -85,20 +85,20 @@ func (r *PurchaseRepository) CreatePurchase(ctx context.Context, req models.Purc
 	now := time.Now().UTC()
 	purchaseID := uuid.Must(uuid.NewV7())
 
-	var snapshots []models.PurchasedItemSnapshot
+	var snapshots []model.PurchasedItemSnapshot
 	sellerTotals := make(map[uuid.UUID]int)
-	var purchasedItems []models.ProductResponse // Akan diisi tanpa FileURI dulu
+	var purchasedItems []model.ProductResponse // Akan diisi tanpa FileURI dulu
 
 	for _, itemReq := range req.PurchasedItems {
 		//  Ambil produk langsung dari DB (dalam transaksi)
 		productInTx, err := q.GetProductByID(ctx, itemReq.ProductID)
 		if err != nil {
-			return models.PurchaseResponse{}, errors.New("product not found in transaction")
+			return model.PurchaseResponse{}, errors.New("product not found in transaction")
 		}
 
 		//  Validasi stok
 		if itemReq.Qty > productInTx.Qty {
-			return models.PurchaseResponse{}, errors.New("insufficient stock for product: " + productInTx.Name)
+			return model.PurchaseResponse{}, errors.New("insufficient stock for product: " + productInTx.Name)
 		}
 
 		//  Update stok (update stock ketika upload file)
@@ -108,14 +108,14 @@ func (r *PurchaseRepository) CreatePurchase(ctx context.Context, req models.Purc
 		// }
 		// rowsAffected, err := q.UpdateProductQty(ctx, updateParams)
 		// if err != nil {
-		// 	return models.PurchaseResponse{}, err
+		// 	return model.PurchaseResponse{}, err
 		// }
 		// if rowsAffected == 0 {
-		// 	return models.PurchaseResponse{}, errors.New("failed to update stock")
+		// 	return model.PurchaseResponse{}, errors.New("failed to update stock")
 		// }
 
 		//  Simpan snapshot — tanpa FileURI (akan diisi di service)
-		snapshot := models.PurchasedItemSnapshot{
+		snapshot := model.PurchasedItemSnapshot{
 			ProductID: itemReq.ProductID,
 			Name:      productInTx.Name,
 			Category:  productInTx.Category,
@@ -131,7 +131,7 @@ func (r *PurchaseRepository) CreatePurchase(ctx context.Context, req models.Purc
 		sellerTotals[productInTx.UserID] += int(productInTx.Price) * itemReq.Qty
 
 		//  Tambahkan ke purchasedItems — tanpa FileURI dulu
-		purchasedItems = append(purchasedItems, models.ProductResponse{
+		purchasedItems = append(purchasedItems, model.ProductResponse{
 			ProductID:        productInTx.ID,
 			Name:             productInTx.Name,
 			Category:         productInTx.Category,
@@ -148,11 +148,11 @@ func (r *PurchaseRepository) CreatePurchase(ctx context.Context, req models.Purc
 	}
 
 	//  Generate payment details
-	var paymentDetails []models.PaymentDetail
+	var paymentDetails []model.PaymentDetail
 	for sellerID, total := range sellerTotals {
 		userInTx, err := q.GetUserByID(ctx, sellerID)
 		if err != nil {
-			paymentDetails = append(paymentDetails, models.PaymentDetail{
+			paymentDetails = append(paymentDetails, model.PaymentDetail{
 				BankAccountName:   "",
 				BankAccountHolder: "",
 				BankAccountNumber: "",
@@ -182,7 +182,7 @@ func (r *PurchaseRepository) CreatePurchase(ctx context.Context, req models.Purc
 			bankAccountNumber = userInTx.BankAccountNumber
 		}
 
-		paymentDetails = append(paymentDetails, models.PaymentDetail{
+		paymentDetails = append(paymentDetails, model.PaymentDetail{
 			BankAccountName:   bankAccountName,
 			BankAccountHolder: bankAccountHolder,
 			BankAccountNumber: bankAccountNumber,
@@ -199,12 +199,12 @@ func (r *PurchaseRepository) CreatePurchase(ctx context.Context, req models.Purc
 	//  Serialize dan simpan
 	snapshotsJSON, err := json.Marshal(snapshots)
 	if err != nil {
-		return models.PurchaseResponse{}, err
+		return model.PurchaseResponse{}, err
 	}
 
 	paymentDetailsJSON, err := json.Marshal(paymentDetails)
 	if err != nil {
-		return models.PurchaseResponse{}, err
+		return model.PurchaseResponse{}, err
 	}
 
 	createParams := database.CreatePurchaseParams{
@@ -219,16 +219,16 @@ func (r *PurchaseRepository) CreatePurchase(ctx context.Context, req models.Purc
 	}
 	err = q.CreatePurchase(ctx, createParams)
 	if err != nil {
-		return models.PurchaseResponse{}, err
+		return model.PurchaseResponse{}, err
 	}
 
 	//  Commit
 	if err := tx.Commit(ctx); err != nil {
-		return models.PurchaseResponse{}, errors.New("failed to commit transaction")
+		return model.PurchaseResponse{}, errors.New("failed to commit transaction")
 	}
 
 	//  Return response — tanpa FileURI (akan diisi di service)
-	return models.PurchaseResponse{
+	return model.PurchaseResponse{
 		PurchaseID:     purchaseID,
 		PurchasedItems: purchasedItems,
 		TotalPrice:     grandTotal,

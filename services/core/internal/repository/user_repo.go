@@ -1,9 +1,9 @@
-package repositories
+package repository
 
 import (
 	"context"
 
-	"github.com/teammachinist/tutuplapak/internal/database"
+	"github.com/teammachinist/tutuplapak/services/core/internal/database"
 
 	"github.com/google/uuid"
 )

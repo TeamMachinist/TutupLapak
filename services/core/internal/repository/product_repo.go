@@ -1,4 +1,4 @@
-package repositories
+package repository
 
 import (
 	"context"
@@ -7,16 +7,16 @@ import (
 	"log"
 	"time"
 
-	"github.com/teammachinist/tutuplapak/internal/database"
-	"github.com/teammachinist/tutuplapak/services/core/models"
+	"github.com/teammachinist/tutuplapak/services/core/internal/database"
+	"github.com/teammachinist/tutuplapak/services/core/internal/model"
 
 	"github.com/google/uuid"
 )
 
 type ProductRepositoryInterface interface {
-	CreateProduct(ctx context.Context, req models.ProductRequest) (models.ProductResponse, error)
+	CreateProduct(ctx context.Context, req model.ProductRequest) (model.ProductResponse, error)
 	CheckSKUExistsByUser(ctx context.Context, sku string, userID uuid.UUID) (CheckSKUExistsByUserRow, error)
-	GetAllProducts(ctx context.Context, params models.GetAllProductsParams) ([]models.Product, error)
+	GetAllProducts(ctx context.Context, params model.GetAllProductsParams) ([]model.Product, error)
 	UpdateProduct(ctx context.Context, params database.UpdateProductParams) (database.UpdateProductRow, error)
 	CheckProductOwnership(ctx context.Context, productID uuid.UUID, userID uuid.UUID) (bool, error)
 	DeleteProduct(ctx context.Context, productID uuid.UUID, userID uuid.UUID) error
@@ -49,12 +49,12 @@ func (r *ProductRepository) UpdateProductQty(ctx context.Context, productID stri
 	return nil
 }
 
-func (r *ProductRepository) CreateProduct(ctx context.Context, req models.ProductRequest) (models.ProductResponse, error) {
+func (r *ProductRepository) CreateProduct(ctx context.Context, req model.ProductRequest) (model.ProductResponse, error) {
 	productID := uuid.Must(uuid.NewV7())
 
 	fileID, err := uuid.Parse(req.FileID)
 	if err != nil {
-		return models.ProductResponse{}, err
+		return model.ProductResponse{}, err
 	}
 
 	dbProduct, err := r.db.CreateProduct(ctx, database.CreateProductParams{
@@ -70,10 +70,10 @@ func (r *ProductRepository) CreateProduct(ctx context.Context, req models.Produc
 		UpdatedAt: time.Now().UTC(),
 	})
 	if err != nil {
-		return models.ProductResponse{}, err
+		return model.ProductResponse{}, err
 	}
 
-	resp := models.ProductResponse{
+	resp := model.ProductResponse{
 		ProductID:        dbProduct.ID,
 		Name:             dbProduct.Name,
 		Category:         dbProduct.Category,
@@ -109,7 +109,7 @@ func (r *ProductRepository) CheckSKUExistsByUser(ctx context.Context, sku string
 	}, nil
 }
 
-func (r *ProductRepository) GetAllProducts(ctx context.Context, params models.GetAllProductsParams) ([]models.Product, error) {
+func (r *ProductRepository) GetAllProducts(ctx context.Context, params model.GetAllProductsParams) ([]model.Product, error) {
 	// limit := int32(5)
 	// if params.Limit > 0 {
 	// 	limit = int32(params.Limit)
@@ -154,9 +154,9 @@ func (r *ProductRepository) GetAllProducts(ctx context.Context, params models.Ge
 		return nil, err
 	}
 
-	products := make([]models.Product, len(rows))
+	products := make([]model.Product, len(rows))
 	for i, row := range rows {
-		products[i] = models.Product{
+		products[i] = model.Product{
 			ID:               row.ID,
 			Name:             row.Name,
 			Category:         row.Category,

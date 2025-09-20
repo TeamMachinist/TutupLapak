@@ -1,5 +1,4 @@
-// services/purchase.go
-package services
+package service
 
 import (
 	"context"
@@ -7,30 +6,30 @@ import (
 	"fmt"
 	"strings"
 
-	// "github.com/teammachinist/tutuplapak/clients"
+	"github.com/teammachinist/tutuplapak/services/core/internal/clients"
+	"github.com/teammachinist/tutuplapak/services/core/internal/database"
+	"github.com/teammachinist/tutuplapak/services/core/internal/model"
+	"github.com/teammachinist/tutuplapak/services/core/internal/repository"
+
 	"github.com/google/uuid"
-	"github.com/teammachinist/tutuplapak/internal/database"
-	"github.com/teammachinist/tutuplapak/services/core/clients"
-	"github.com/teammachinist/tutuplapak/services/core/models"
-	"github.com/teammachinist/tutuplapak/services/core/repositories"
 )
 
 type PurchaseServiceInterface interface {
-	CreatePurchase(ctx context.Context, req models.PurchaseRequest) (models.PurchaseResponse, error)
+	CreatePurchase(ctx context.Context, req model.PurchaseRequest) (model.PurchaseResponse, error)
 	UploadPaymentProof(ctx context.Context, purchaseId string, req []string) error
 }
 
 type PurchaseService struct {
-	purchaseRepo repositories.PurchaseRepositoryInterface
-	productRepo  repositories.ProductRepositoryInterface
+	purchaseRepo repository.PurchaseRepositoryInterface
+	productRepo  repository.ProductRepositoryInterface
 	fileClient   clients.FileClientInterface
 }
 
-func (s *PurchaseService) CreatePurchase(ctx context.Context, req models.PurchaseRequest) (models.PurchaseResponse, error) {
+func (s *PurchaseService) CreatePurchase(ctx context.Context, req model.PurchaseRequest) (model.PurchaseResponse, error) {
 
 	resp, err := s.purchaseRepo.CreatePurchase(ctx, req)
 	if err != nil {
-		return models.PurchaseResponse{}, err
+		return model.PurchaseResponse{}, err
 	}
 
 	for i, item := range resp.PurchasedItems {
@@ -59,7 +58,7 @@ func (s *PurchaseService) UploadPaymentProof(ctx context.Context, purchaseId str
 	}
 
 	// Validasi status unpaid
-	if purchase.Status != models.PurchaseStatus(database.PurchaseStatusUnpaid) {
+	if purchase.Status != model.PurchaseStatus(database.PurchaseStatusUnpaid) {
 		return errors.New("purchase is already paid")
 	}
 
@@ -95,8 +94,8 @@ func (s *PurchaseService) UploadPaymentProof(ctx context.Context, purchaseId str
 }
 
 func NewPurchaseService(
-	purchaseRepo repositories.PurchaseRepositoryInterface,
-	productRepo repositories.ProductRepositoryInterface,
+	purchaseRepo repository.PurchaseRepositoryInterface,
+	productRepo repository.ProductRepositoryInterface,
 	fileClient clients.FileClientInterface,
 
 ) PurchaseServiceInterface {

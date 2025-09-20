@@ -1,4 +1,4 @@
-package services
+package service
 
 import (
 	"context"
@@ -7,30 +7,30 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/teammachinist/tutuplapak/internal/cache"
-	"github.com/teammachinist/tutuplapak/internal/database"
-	"github.com/teammachinist/tutuplapak/services/core/clients"
-	"github.com/teammachinist/tutuplapak/services/core/models"
-	"github.com/teammachinist/tutuplapak/services/core/repositories"
+	"github.com/teammachinist/tutuplapak/services/core/internal/cache"
+	"github.com/teammachinist/tutuplapak/services/core/internal/clients"
+	"github.com/teammachinist/tutuplapak/services/core/internal/database"
+	"github.com/teammachinist/tutuplapak/services/core/internal/model"
+	"github.com/teammachinist/tutuplapak/services/core/internal/repository"
 
 	"github.com/google/uuid"
 )
 
 type UserServiceInterface interface {
-	LinkPhone(ctx context.Context, userID uuid.UUID, phone string) (*models.LinkPhoneResponse, error)
-	LinkEmail(ctx context.Context, userID uuid.UUID, email string) (*models.LinkEmailResponse, error)
-	GetUserWithFileId(ctx context.Context, userID uuid.UUID) (models.UserResponse, error)
-	UpdateUser(ctx context.Context, userId uuid.UUID, req models.UserRequest) (models.UserResponse, error)
+	LinkPhone(ctx context.Context, userID uuid.UUID, phone string) (*model.LinkPhoneResponse, error)
+	LinkEmail(ctx context.Context, userID uuid.UUID, email string) (*model.LinkEmailResponse, error)
+	GetUserWithFileId(ctx context.Context, userID uuid.UUID) (model.UserResponse, error)
+	UpdateUser(ctx context.Context, userId uuid.UUID, req model.UserRequest) (model.UserResponse, error)
 }
 
 type UserService struct {
-	userRepo   repositories.UserRepositoryInterface
+	userRepo   repository.UserRepositoryInterface
 	fileClient clients.FileClientInterface
 	cache      *cache.RedisCache
 }
 
 func NewUserService(
-	userRepo repositories.UserRepositoryInterface,
+	userRepo repository.UserRepositoryInterface,
 	fileClient clients.FileClientInterface,
 	cache *cache.RedisCache,
 ) UserServiceInterface {
@@ -41,7 +41,7 @@ func NewUserService(
 	}
 }
 
-func (s *UserService) LinkPhone(ctx context.Context, userID uuid.UUID, phone string) (*models.LinkPhoneResponse, error) {
+func (s *UserService) LinkPhone(ctx context.Context, userID uuid.UUID, phone string) (*model.LinkPhoneResponse, error) {
 	if err := s.validatePhone(phone); err != nil {
 		return nil, err
 	}
@@ -64,6 +64,8 @@ func (s *UserService) LinkPhone(ctx context.Context, userID uuid.UUID, phone str
 		return nil, err
 	}
 
+	// TODO: Update phone in users_auth via authz package or http_client
+
 	// Get file data if fileID exists
 	var fileURI, fileThumbnailURI string
 	if user.FileID != nil {
@@ -77,7 +79,7 @@ func (s *UserService) LinkPhone(ctx context.Context, userID uuid.UUID, phone str
 	}
 
 	// Build response
-	response := &models.LinkPhoneResponse{
+	response := &model.LinkPhoneResponse{
 		FileID:            "",
 		FileURI:           fileURI,
 		FileThumbnailURI:  fileThumbnailURI,
@@ -113,7 +115,7 @@ func (s *UserService) LinkPhone(ctx context.Context, userID uuid.UUID, phone str
 	return response, nil
 }
 
-func (s *UserService) LinkEmail(ctx context.Context, userID uuid.UUID, email string) (*models.LinkEmailResponse, error) {
+func (s *UserService) LinkEmail(ctx context.Context, userID uuid.UUID, email string) (*model.LinkEmailResponse, error) {
 	if err := s.validateEmail(email); err != nil {
 		return nil, err
 	}
@@ -136,6 +138,8 @@ func (s *UserService) LinkEmail(ctx context.Context, userID uuid.UUID, email str
 		return nil, err
 	}
 
+	// TODO: Update email in users_auth via authz package or http_client
+
 	// Get file data if fileID exists
 	var fileURI, fileThumbnailURI string
 	if user.FileID != nil {
@@ -149,7 +153,7 @@ func (s *UserService) LinkEmail(ctx context.Context, userID uuid.UUID, email str
 	}
 
 	// Build response
-	response := &models.LinkEmailResponse{
+	response := &model.LinkEmailResponse{
 		FileID:            "",
 		FileURI:           fileURI,
 		FileThumbnailURI:  fileThumbnailURI,
@@ -202,10 +206,10 @@ func (s *UserService) validatePhone(phone string) error {
 	return nil
 }
 
-func (s *UserService) GetUserWithFileId(ctx context.Context, userID uuid.UUID) (models.UserResponse, error) {
-	var userFile models.UserResponse
+func (s *UserService) GetUserWithFileId(ctx context.Context, userID uuid.UUID) (model.UserResponse, error) {
+	var userFile model.UserResponse
 	if err := s.cache.Get(ctx, fmt.Sprintf(cache.UserFileListKey, userID.String()), &userFile); err == nil {
-		return models.UserResponse{
+		return model.UserResponse{
 			Email:             userFile.Email,
 			Phone:             userFile.Phone,
 			FileID:            userFile.FileID,
@@ -219,7 +223,7 @@ func (s *UserService) GetUserWithFileId(ctx context.Context, userID uuid.UUID) (
 
 	rows, err := s.userRepo.GetUserByID(ctx, userID)
 	if err != nil {
-		return models.UserResponse{}, errors.New("user does not exist")
+		return model.UserResponse{}, errors.New("user does not exist")
 	}
 
 	fileID := ""
@@ -231,7 +235,7 @@ func (s *UserService) GetUserWithFileId(ctx context.Context, userID uuid.UUID) (
 		if err := s.cache.Get(ctx, cache.FileMetadataKey, file); err != nil {
 			clientFile, err := s.fileClient.GetFileByID(ctx, *rows.FileID)
 			if err != nil {
-				return models.UserResponse{}, err
+				return model.UserResponse{}, err
 			}
 			file = clientFile
 		}
@@ -240,7 +244,7 @@ func (s *UserService) GetUserWithFileId(ctx context.Context, userID uuid.UUID) (
 		fileThumbnailURI = file.FileThumbnailURI
 	}
 
-	resp := models.UserResponse{
+	resp := model.UserResponse{
 		Email:             rows.Email,
 		Phone:             rows.Phone,
 		FileID:            fileID,
@@ -258,9 +262,9 @@ func (s *UserService) GetUserWithFileId(ctx context.Context, userID uuid.UUID) (
 
 func (s *UserService) UpdateUser(ctx context.Context,
 	userID uuid.UUID,
-	req models.UserRequest,
-) (models.UserResponse, error) {
-	var userFile models.UserResponse
+	req model.UserRequest,
+) (model.UserResponse, error) {
+	var userFile model.UserResponse
 
 	fileUUID := stringPtrToUUID(req.FileID)
 
@@ -289,14 +293,14 @@ func (s *UserService) UpdateUser(ctx context.Context,
 		if err := s.cache.Get(ctx, cache.FileMetadataKey, file); err != nil {
 			clientFile, err := s.fileClient.GetFileByID(ctx, *fileUUID)
 			if err != nil {
-				return models.UserResponse{}, err
+				return model.UserResponse{}, err
 			}
 			file = clientFile
 		}
 
 		// Check Ownership
 		if userID.String() != file.UserID {
-			return models.UserResponse{}, errors.New("unauthorized: you don't own this file")
+			return model.UserResponse{}, errors.New("unauthorized: you don't own this file")
 		}
 
 		fileID = file.ID.String()
@@ -312,10 +316,10 @@ func (s *UserService) UpdateUser(ctx context.Context,
 		})
 
 		if err != nil {
-			return models.UserResponse{}, err
+			return model.UserResponse{}, err
 		}
 
-		resp := models.UserResponse{
+		resp := model.UserResponse{
 			Email:             rows.Email,
 			Phone:             rows.Phone,
 			FileID:            fileID,
@@ -341,10 +345,10 @@ func (s *UserService) UpdateUser(ctx context.Context,
 	})
 
 	if err != nil {
-		return models.UserResponse{}, err
+		return model.UserResponse{}, err
 	}
 
-	resp := models.UserResponse{
+	resp := model.UserResponse{
 		Email:             rows.Email,
 		Phone:             rows.Phone,
 		FileID:            fileID,

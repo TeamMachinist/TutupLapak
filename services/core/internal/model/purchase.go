@@ -1,5 +1,5 @@
 // models/purchase.go
-package models
+package model
 
 import (
 	"time"

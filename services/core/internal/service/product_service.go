@@ -1,4 +1,4 @@
-package services
+package service
 
 import (
 	"context"
@@ -11,38 +11,38 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teammachinist/tutuplapak/internal/cache"
-	"github.com/teammachinist/tutuplapak/internal/database"
-	"github.com/teammachinist/tutuplapak/services/core/clients"
-	"github.com/teammachinist/tutuplapak/services/core/models"
-	"github.com/teammachinist/tutuplapak/services/core/repositories"
+	"github.com/teammachinist/tutuplapak/services/core/internal/cache"
+	"github.com/teammachinist/tutuplapak/services/core/internal/clients"
+	"github.com/teammachinist/tutuplapak/services/core/internal/database"
+	"github.com/teammachinist/tutuplapak/services/core/internal/model"
+	"github.com/teammachinist/tutuplapak/services/core/internal/repository"
 
 	"github.com/google/uuid"
 )
 
 type ProductServiceInterface interface {
-	CreateProduct(ctx context.Context, req models.ProductRequest) (models.ProductResponse, error)
-	GetAllProducts(ctx context.Context, filter models.GetAllProductsParams) ([]models.ProductResponse, error)
+	CreateProduct(ctx context.Context, req model.ProductRequest) (model.ProductResponse, error)
+	GetAllProducts(ctx context.Context, filter model.GetAllProductsParams) ([]model.ProductResponse, error)
 	UpdateProduct(
 		ctx context.Context,
 		productID uuid.UUID,
-		req models.ProductRequest,
+		req model.ProductRequest,
 		userID uuid.UUID,
-	) (models.ProductResponse, error)
+	) (model.ProductResponse, error)
 	DeleteProduct(ctx context.Context, productID uuid.UUID, userID uuid.UUID) error
 }
 
 type ProductService struct {
-	productRepo repositories.ProductRepositoryInterface
-	// userRepo	repositories.UserRepositoryInterface
+	productRepo repository.ProductRepositoryInterface
+	// userRepo	repository.UserRepositoryInterface
 	// authClient  clients.AuthClientInterface
 	fileClient clients.FileClientInterface
 	cache      *cache.RedisCache
 }
 
 func NewProductService(
-	productRepo repositories.ProductRepositoryInterface,
-	// userRepo repositories.UserRepositoryInterface,
+	productRepo repository.ProductRepositoryInterface,
+	// userRepo repository.UserRepositoryInterface,
 	// authClient clients.AuthClientInterface,
 	fileClient clients.FileClientInterface,
 	cache *cache.RedisCache,
@@ -56,22 +56,22 @@ func NewProductService(
 	}
 }
 
-func (s *ProductService) CreateProduct(ctx context.Context, req models.ProductRequest) (models.ProductResponse, error) {
+func (s *ProductService) CreateProduct(ctx context.Context, req model.ProductRequest) (model.ProductResponse, error) {
 	// Check if SKU already exists for the user
 	_, err := s.productRepo.CheckSKUExistsByUser(ctx, req.SKU, req.UserID)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
-			return models.ProductResponse{}, fmt.Errorf("failed to check SKU existence: %w", err)
+			return model.ProductResponse{}, fmt.Errorf("failed to check SKU existence: %w", err)
 		}
 	} else {
-		return models.ProductResponse{}, errors.New("sku already exists")
+		return model.ProductResponse{}, errors.New("sku already exists")
 	}
 
 	var parsedFileId uuid.UUID
 
 	fileID, err := uuid.Parse(req.FileID)
 	if err != nil {
-		return models.ProductResponse{}, err
+		return model.ProductResponse{}, err
 	}
 
 	parsedFileId = fileID
@@ -80,7 +80,7 @@ func (s *ProductService) CreateProduct(ctx context.Context, req models.ProductRe
 	if req.FileID != "" {
 		f, err := s.fileClient.GetFileByID(ctx, parsedFileId)
 		if err != nil {
-			return models.ProductResponse{}, errors.New("file not found") // tetap pakai string ini untuk handler
+			return model.ProductResponse{}, errors.New("file not found") // tetap pakai string ini untuk handler
 		}
 		file = f
 	}
@@ -88,7 +88,7 @@ func (s *ProductService) CreateProduct(ctx context.Context, req models.ProductRe
 	// Create product
 	productResp, err := s.productRepo.CreateProduct(ctx, req)
 	if err != nil {
-		return models.ProductResponse{}, fmt.Errorf("failed to create product: %w", err)
+		return model.ProductResponse{}, fmt.Errorf("failed to create product: %w", err)
 	}
 
 	// Attach file info if present
@@ -102,10 +102,10 @@ func (s *ProductService) CreateProduct(ctx context.Context, req models.ProductRe
 	return productResp, nil
 }
 
-func (s *ProductService) GetAllProducts(ctx context.Context, filter models.GetAllProductsParams) ([]models.ProductResponse, error) {
+func (s *ProductService) GetAllProducts(ctx context.Context, filter model.GetAllProductsParams) ([]model.ProductResponse, error) {
 	key := cache.ProductListKey + generateFilterHash(filter)
 
-	var products []models.ProductResponse
+	var products []model.ProductResponse
 
 	err := s.cache.Get(ctx, key, &products)
 	if err == nil {
@@ -119,9 +119,9 @@ func (s *ProductService) GetAllProducts(ctx context.Context, filter models.GetAl
 		return nil, err
 	}
 
-	var responses []models.ProductResponse
+	var responses []model.ProductResponse
 	for _, p := range productsDB {
-		resp := models.ProductResponse{
+		resp := model.ProductResponse{
 			ProductID: p.ID,
 			Name:      p.Name,
 			Category:  p.Category,
@@ -157,30 +157,30 @@ func (s *ProductService) GetAllProducts(ctx context.Context, filter models.GetAl
 func (s *ProductService) UpdateProduct(
 	ctx context.Context,
 	productID uuid.UUID,
-	req models.ProductRequest,
+	req model.ProductRequest,
 	userID uuid.UUID,
-) (models.ProductResponse, error) {
+) (model.ProductResponse, error) {
 
 	owned, err := s.productRepo.CheckProductOwnership(ctx, productID, userID)
 	if err != nil {
 		// fmt.Printf("Error checking ownership: %v\n", err)
-		return models.ProductResponse{}, fmt.Errorf("internal error verifying ownership")
+		return model.ProductResponse{}, fmt.Errorf("internal error verifying ownership")
 	}
 
 	if !owned {
 		fmt.Println("User does not own this product")
-		return models.ProductResponse{}, errors.New("unauthorized: you don't own this product")
+		return model.ProductResponse{}, errors.New("unauthorized: you don't own this product")
 	}
 	fmt.Println("error disini")
 	existingProduct, err := s.productRepo.CheckSKUExistsByUser(ctx, req.SKU, userID)
 
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
-			return models.ProductResponse{}, err
+			return model.ProductResponse{}, err
 		}
 	} else {
 		if existingProduct.ID != productID {
-			return models.ProductResponse{}, errors.New("sku already exists for this user")
+			return model.ProductResponse{}, errors.New("sku already exists for this user")
 		}
 	}
 	var fileMetadata *clients.FileMetadataResponse
@@ -189,7 +189,7 @@ func (s *ProductService) UpdateProduct(
 
 	fileID, err := uuid.Parse(req.FileID)
 	if err != nil {
-		return models.ProductResponse{}, err
+		return model.ProductResponse{}, err
 	}
 
 	parsedFileId = fileID
@@ -197,7 +197,7 @@ func (s *ProductService) UpdateProduct(
 	if req.FileID != "" {
 		file, err := s.fileClient.GetFileByID(ctx, parsedFileId)
 		if err != nil {
-			return models.ProductResponse{}, errors.New("fileId is not valid / exists")
+			return model.ProductResponse{}, errors.New("fileId is not valid / exists")
 		}
 		fileMetadata = file
 	}
@@ -213,10 +213,10 @@ func (s *ProductService) UpdateProduct(
 		UpdatedAt: time.Now(),
 	})
 	if err != nil {
-		return models.ProductResponse{}, err
+		return model.ProductResponse{}, err
 	}
 
-	resp := models.ProductResponse{
+	resp := model.ProductResponse{
 		ProductID:        updatedRow.ID,
 		Name:             updatedRow.Name,
 		Category:         updatedRow.Category,
@@ -264,7 +264,7 @@ func (s *ProductService) DeleteProduct(ctx context.Context, productID uuid.UUID,
 	return nil
 }
 
-func generateFilterHash(filter models.GetAllProductsParams) string {
+func generateFilterHash(filter model.GetAllProductsParams) string {
 	// Konversi semua field filter ke string, urutkan agar konsisten
 	var parts []string
 

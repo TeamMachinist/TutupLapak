@@ -1,4 +1,4 @@
-package handlers
+package handler
 
 import (
 	"context"
@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/teammachinist/tutuplapak/internal"
-	"github.com/teammachinist/tutuplapak/services/core/models"
-	"github.com/teammachinist/tutuplapak/services/core/services"
+	"github.com/teammachinist/tutuplapak/services/core/internal/model"
+	"github.com/teammachinist/tutuplapak/services/core/internal/service"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
@@ -19,10 +19,10 @@ import (
 )
 
 type ProductHandler struct {
-	productService services.ProductServiceInterface
+	productService service.ProductServiceInterface
 }
 
-func NewProductHandler(productService services.ProductServiceInterface) *ProductHandler {
+func NewProductHandler(productService service.ProductServiceInterface) *ProductHandler {
 	return &ProductHandler{productService: productService}
 }
 
@@ -85,7 +85,7 @@ func (h *ProductHandler) GetAllProducts(c *fiber.Ctx) error {
 		}
 	}
 
-	filter := models.GetAllProductsParams{
+	filter := model.GetAllProductsParams{
 		Limit:     limit,
 		Offset:    offset,
 		ProductID: productID,
@@ -111,7 +111,7 @@ func (h *ProductHandler) GetAllProducts(c *fiber.Ctx) error {
 }
 
 func (h *ProductHandler) CreateProduct(c *fiber.Ctx) error {
-	var req models.ProductRequest
+	var req model.ProductRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid JSON payload",
@@ -154,6 +154,7 @@ func (h *ProductHandler) CreateProduct(c *fiber.Ctx) error {
 		})
 	}
 
+	// TODO: Use authz package
 	userIDStr, ok := internal.GetUserIDFromFiber(c)
 	if !ok {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
@@ -204,7 +205,7 @@ func getJSONTagName(fieldPath string) string {
 	}
 	fieldName := parts[len(parts)-1]
 
-	t := reflect.TypeOf(models.ProductRequest{})
+	t := reflect.TypeOf(model.ProductRequest{})
 	if f, ok := t.FieldByName(fieldName); ok {
 		jsonTag := f.Tag.Get("json")
 		if jsonTag != "" && jsonTag != "-" {
@@ -229,6 +230,7 @@ func (h *ProductHandler) UpdateProduct(c *fiber.Ctx) error {
 		})
 	}
 
+	// TODO: Use authz package
 	userIDStr, ok := internal.GetUserIDFromFiber(c)
 	if !ok {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
@@ -243,7 +245,7 @@ func (h *ProductHandler) UpdateProduct(c *fiber.Ctx) error {
 		})
 	}
 
-	var req models.ProductRequest
+	var req model.ProductRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "invalid request body",
@@ -326,6 +328,7 @@ func (h *ProductHandler) DeleteProduct(c *fiber.Ctx) error {
 		})
 	}
 
+	// TODO: Use authz package
 	userIDStr, ok := internal.GetUserIDFromFiber(c)
 	if !ok {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{

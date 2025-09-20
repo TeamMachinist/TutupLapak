@@ -1,4 +1,4 @@
-package models
+package model
 
 type File struct {
 	ID           string `json:"id"`

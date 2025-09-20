@@ -8,13 +8,14 @@ import (
 	"syscall"
 
 	"github.com/teammachinist/tutuplapak/internal"
-	"github.com/teammachinist/tutuplapak/internal/cache"
-	"github.com/teammachinist/tutuplapak/internal/logger"
-	"github.com/teammachinist/tutuplapak/services/core/clients"
-	"github.com/teammachinist/tutuplapak/services/core/config"
-	"github.com/teammachinist/tutuplapak/services/core/handlers"
-	"github.com/teammachinist/tutuplapak/services/core/repositories"
-	"github.com/teammachinist/tutuplapak/services/core/services"
+	"github.com/teammachinist/tutuplapak/services/core/internal/cache"
+	"github.com/teammachinist/tutuplapak/services/core/internal/clients"
+	"github.com/teammachinist/tutuplapak/services/core/internal/config"
+	"github.com/teammachinist/tutuplapak/services/core/internal/database"
+	"github.com/teammachinist/tutuplapak/services/core/internal/handler"
+	"github.com/teammachinist/tutuplapak/services/core/internal/logger"
+	"github.com/teammachinist/tutuplapak/services/core/internal/repository"
+	"github.com/teammachinist/tutuplapak/services/core/internal/service"
 
 	"github.com/gofiber/fiber/v2"
 	fiberlog "github.com/gofiber/fiber/v2/middleware/logger"
@@ -34,7 +35,7 @@ func main() {
 
 	logger.Init()
 
-	database, err := internal.NewDatabase(ctx, cfg.Database.DatabaseURL)
+	database, err := database.NewDatabase(ctx, cfg.Database.DatabaseURL)
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
@@ -63,6 +64,7 @@ func main() {
 		})
 	})
 
+	// TODO: Use authz package
 	jwtConfig := &internal.JWTConfig{
 		Key:      cfg.JWT.Secret,
 		Duration: cfg.JWT.Duration,
@@ -72,17 +74,17 @@ func main() {
 
 	fileClient := clients.NewFileClient(cfg.App.FileUrl)
 
-	productRepo := repositories.NewProductRepository(database.Queries)
-	purchaseRepo := repositories.NewPurchaseRepository(database.Pool, database.Queries)
-	userRepo := repositories.NewUserRepository(database.Queries)
+	productRepo := repository.NewProductRepository(database.Queries)
+	purchaseRepo := repository.NewPurchaseRepository(database.Pool, database.Queries)
+	userRepo := repository.NewUserRepository(database.Queries)
 
-	productService := services.NewProductService(productRepo, fileClient, redisClient)
-	purchaseService := services.NewPurchaseService(purchaseRepo, productRepo, fileClient)
-	userService := services.NewUserService(userRepo, fileClient, redisClient)
+	productService := service.NewProductService(productRepo, fileClient, redisClient)
+	purchaseService := service.NewPurchaseService(purchaseRepo, productRepo, fileClient)
+	userService := service.NewUserService(userRepo, fileClient, redisClient)
 
-	productHandler := handlers.NewProductHandler(productService)
-	purchaseHandler := handlers.NewPurchaseHandler(purchaseService)
-	userHandler := handlers.NewUserHandler(userService)
+	productHandler := handler.NewProductHandler(productService)
+	purchaseHandler := handler.NewPurchaseHandler(purchaseService)
+	userHandler := handler.NewUserHandler(userService)
 
 	api := app.Group("/api/v1")
 
