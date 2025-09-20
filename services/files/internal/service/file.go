@@ -1,4 +1,4 @@
-package main
+package service
 
 import (
 	"context"
@@ -6,9 +6,10 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/teammachinist/tutuplapak/internal/cache"
-	"github.com/teammachinist/tutuplapak/internal/database"
-	"github.com/teammachinist/tutuplapak/internal/logger"
+	"github.com/teammachinist/tutuplapak/services/files/internal/cache"
+	"github.com/teammachinist/tutuplapak/services/files/internal/database"
+	"github.com/teammachinist/tutuplapak/services/files/internal/logger"
+	"github.com/teammachinist/tutuplapak/services/files/internal/model"
 )
 
 type FileService struct {
@@ -23,7 +24,7 @@ func NewFileService(queries *database.Queries, cache *cache.RedisCache) FileServ
 	}
 }
 
-func (s FileService) CreateFiles(ctx context.Context, file File) (File, error) {
+func (s FileService) CreateFiles(ctx context.Context, file model.File) (model.File, error) {
 	logger.InfoCtx(ctx, "Creating file record", "file_id", file.ID, "user_id", file.UserID)
 
 	// Create file record in database
@@ -41,11 +42,11 @@ func (s FileService) CreateFiles(ctx context.Context, file File) (File, error) {
 			"file_id", file.ID,
 			"user_id", file.UserID,
 		)
-		return File{}, fmt.Errorf("failed to create file: %w", err)
+		return model.File{}, fmt.Errorf("failed to create file: %w", err)
 	}
 
 	// Convert database file to our File model
-	createdFile := File{
+	createdFile := model.File{
 		ID:               dbFile.ID,
 		UserID:           dbFile.UserID,
 		FileURI:          dbFile.FileUri,
@@ -92,12 +93,12 @@ func (s FileService) CreateFiles(ctx context.Context, file File) (File, error) {
 	return createdFile, nil
 }
 
-func (s FileService) GetFile(ctx context.Context, fileID uuid.UUID) (File, error) {
+func (s FileService) GetFile(ctx context.Context, fileID uuid.UUID) (model.File, error) {
 	logger.DebugCtx(ctx, "Getting file", "file_id", fileID)
 
 	// Try cache first
 	cacheKey := fmt.Sprintf(cache.FileMetadataKey, fileID.String())
-	var cachedFile File
+	var cachedFile model.File
 
 	if err := s.cache.Get(ctx, cacheKey, &cachedFile); err == nil {
 		logger.DebugCtx(ctx, "File retrieved from cache", "file_id", fileID)
@@ -112,14 +113,14 @@ func (s FileService) GetFile(ctx context.Context, fileID uuid.UUID) (File, error
 		fmt.Printf("ErrorErrorErrorError: %s", err)
 		if err.Error() == "no rows in result set" {
 			logger.WarnCtx(ctx, "File not found", "file_id", fileID)
-			return File{}, fmt.Errorf("file not found")
+			return model.File{}, fmt.Errorf("file not found")
 		}
 		logger.ErrorCtx(ctx, "Failed to get file from database", "error", err, "file_id", fileID)
-		return File{}, fmt.Errorf("failed to get file: %w", err)
+		return model.File{}, fmt.Errorf("failed to get file: %w", err)
 	}
 
 	// Convert database file to our File model
-	file := File{
+	file := model.File{
 		ID:               dbFile.ID,
 		UserID:           dbFile.UserID,
 		FileURI:          dbFile.FileUri,
@@ -158,7 +159,7 @@ func (s FileService) GetFiles(ctx context.Context, fileID []uuid.UUID) ([]databa
 	cacheData := map[string]interface{}{}
 	for _, f := range files {
 		key := fmt.Sprintf(cache.FileMetadataKey, f.ID.String())
-		cacheData[key] = File{
+		cacheData[key] = model.File{
 			ID:               f.ID,
 			UserID:           f.UserID,
 			FileURI:          f.FileUri,
@@ -242,11 +243,11 @@ func (s FileService) DeleteFiles(ctx context.Context, fileID uuid.UUID, userID s
 }
 
 // GetUserFiles retrieves all files for a specific user (with caching)
-func (s FileService) GetUserFiles(ctx context.Context, userID string) ([]File, error) {
+func (s FileService) GetUserFiles(ctx context.Context, userID string) ([]model.File, error) {
 	logger.DebugCtx(ctx, "Getting user files", "user_id", userID)
 
 	cacheKey := fmt.Sprintf(cache.UserFileListKey, userID)
-	var files []File
+	var files []model.File
 
 	err := s.cache.GetOrSet(ctx, cacheKey, &files, cache.FileListTTL, func() (interface{}, error) {
 		logger.DebugCtx(ctx, "User files cache miss - querying database", "user_id", userID)
@@ -256,16 +257,16 @@ func (s FileService) GetUserFiles(ctx context.Context, userID string) ([]File, e
 			return nil, fmt.Errorf("invalid user ID: %w", err)
 		}
 
-		dbFiles, err := s.queries.GetFilesByUser(ctx, userUUID)
+		dbFiles, err := s.queries.GetFilesByUserID(ctx, userUUID)
 		if err != nil {
 			logger.ErrorCtx(ctx, "Failed to get user files from database", "error", err, "user_id", userID)
 			return nil, fmt.Errorf("failed to get user files: %w", err)
 		}
 
 		// Convert database files to our File model
-		fileList := make([]File, len(dbFiles))
+		fileList := make([]model.File, len(dbFiles))
 		for i, dbFile := range dbFiles {
-			fileList[i] = File{
+			fileList[i] = model.File{
 				ID:               dbFile.ID,
 				UserID:           dbFile.UserID,
 				FileURI:          dbFile.FileUri,

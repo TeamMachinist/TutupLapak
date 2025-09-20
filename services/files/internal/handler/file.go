@@ -1,4 +1,4 @@
-package main
+package handler
 
 import (
 	"bytes"
@@ -14,19 +14,22 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/teammachinist/tutuplapak/internal"
-	"github.com/teammachinist/tutuplapak/internal/api"
-	"github.com/teammachinist/tutuplapak/internal/logger"
+	"github.com/teammachinist/tutuplapak/services/files/internal/api"
+	"github.com/teammachinist/tutuplapak/services/files/internal/logger"
+	"github.com/teammachinist/tutuplapak/services/files/internal/model"
+	"github.com/teammachinist/tutuplapak/services/files/internal/service"
+	"github.com/teammachinist/tutuplapak/services/files/internal/storage"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/nfnt/resize"
 )
 
 type FileHandler struct {
-	fileService FileService
-	storage     *MinIOStorage
+	fileService service.FileService
+	storage     *storage.MinIOStorage
 }
 
-func NewFileHandler(minioStorage *MinIOStorage, fileService FileService) *FileHandler {
+func NewFileHandler(minioStorage *storage.MinIOStorage, fileService service.FileService) *FileHandler {
 	return &FileHandler{
 		storage:     minioStorage,
 		fileService: fileService,
@@ -47,6 +50,7 @@ func (h *FileHandler) DeleteFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// TODO: wrap authClient
 	// Get user ID from auth middleware
 	userID, ok := internal.GetUserIDFromChi(r)
 	if !ok {
@@ -170,7 +174,8 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 
 	logger.InfoCtx(requestCtx, "File upload request started")
 
-	// Get user ID from auth middleware context
+	// TODO: wrap authClient
+	// // Get user ID from auth middleware context
 	userID, ok := internal.GetUserIDFromChi(r)
 	if !ok {
 		logger.ErrorCtx(requestCtx, "Missing user ID from auth context")
@@ -292,7 +297,7 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create file record
-	fileData := File{
+	fileData := model.File{
 		ID:               fileId,
 		UserID:           userUUID,
 		FileURI:          uri,

@@ -1,4 +1,4 @@
-package main
+package storage
 
 import (
 	"context"
@@ -27,8 +27,8 @@ type MinIOStorage struct {
 
 func NewMinIOStorage(config *MinIOConfig) (*MinIOStorage, error) {
 	client, err := minio.New(config.Endpoint, &minio.Options{
-    Creds:  credentials.NewStaticV4(config.AccessKey, config.SecretKey, ""),		
-	Secure: config.UseSSL,
+		Creds:  credentials.NewStaticV4(config.AccessKey, config.SecretKey, ""),
+		Secure: config.UseSSL,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize MinIO client: %w", err)
@@ -79,4 +79,3 @@ func (s *MinIOStorage) UploadFile(ctx context.Context, file io.Reader, header *m
 	// Return public URL
 	return fmt.Sprintf("%s/%s/%s", s.config.PublicEndpoint, s.config.BucketName, objectName), nil
 }
-

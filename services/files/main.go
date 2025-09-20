@@ -9,8 +9,12 @@ import (
 	"time"
 
 	"github.com/teammachinist/tutuplapak/internal"
-	"github.com/teammachinist/tutuplapak/internal/cache"
-	"github.com/teammachinist/tutuplapak/internal/logger"
+	"github.com/teammachinist/tutuplapak/services/files/internal/cache"
+	"github.com/teammachinist/tutuplapak/services/files/internal/database"
+	"github.com/teammachinist/tutuplapak/services/files/internal/handler"
+	"github.com/teammachinist/tutuplapak/services/files/internal/logger"
+	"github.com/teammachinist/tutuplapak/services/files/internal/service"
+	"github.com/teammachinist/tutuplapak/services/files/internal/storage"
 
 	"github.com/caarlos0/env"
 	"github.com/go-chi/chi/v5"
@@ -42,15 +46,15 @@ type Config struct {
 }
 
 type Dependencies struct {
-	DB         *internal.DB
+	DB         *database.DB
 	RedisCache *cache.RedisCache
 	JWTService *internal.JWTService
-	MinIO      *MinIOStorage
+	MinIO      *storage.MinIOStorage
 }
 
 type Services struct {
-	FileService FileService
-	FileHandler *FileHandler
+	FileService service.FileService
+	FileHandler *handler.FileHandler
 }
 
 func main() {
@@ -102,7 +106,7 @@ func setupDependencies(cfg Config) Dependencies {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	db, err := internal.NewDatabase(ctx, cfg.DatabaseURL)
+	db, err := database.NewDatabase(ctx, cfg.DatabaseURL)
 	if err != nil {
 		logger.Error("Database connection failed", "error", err, "url", cfg.DatabaseURL)
 		os.Exit(1)
@@ -132,7 +136,7 @@ func setupDependencies(cfg Config) Dependencies {
 	logger.Info("JWT service initialized", "issuer", cfg.JWTIssuer, "duration", cfg.JWTDuration)
 
 	// Initialize MinIO storage
-	minioConfig := &MinIOConfig{
+	minioConfig := &storage.MinIOConfig{
 		Endpoint:       cfg.MinIOEndpoint,
 		BucketName:     cfg.MinIOBucket,
 		PublicEndpoint: cfg.MinIOPublicEndpoint,
@@ -141,7 +145,7 @@ func setupDependencies(cfg Config) Dependencies {
 		SecretKey:      cfg.MinIOSecretKey,
 	}
 
-	minioStorage, err := NewMinIOStorage(minioConfig)
+	minioStorage, err := storage.NewMinIOStorage(minioConfig)
 	if err != nil {
 		logger.Error("Failed to initialize MinIO storage", "error", err, "endpoint", cfg.MinIOEndpoint)
 		os.Exit(1)
@@ -157,8 +161,8 @@ func setupDependencies(cfg Config) Dependencies {
 }
 
 func setupServices(deps Dependencies) Services {
-	fileService := NewFileService(deps.DB.Queries, deps.RedisCache)
-	fileHandler := NewFileHandler(deps.MinIO, fileService)
+	fileService := service.NewFileService(deps.DB.Queries, deps.RedisCache)
+	fileHandler := handler.NewFileHandler(deps.MinIO, fileService)
 
 	return Services{
 		FileService: fileService,
@@ -294,7 +298,7 @@ func requestLoggerMiddleware(next http.Handler) http.Handler {
 }
 
 // Health handler
-func healthHandler(db *internal.DB, redisCache *cache.RedisCache) http.HandlerFunc {
+func healthHandler(db *database.DB, redisCache *cache.RedisCache) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := context.Background()
 		requestCtx := r.Context()
