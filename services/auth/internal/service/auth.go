@@ -1,4 +1,4 @@
-package main
+package service
 
 import (
 	"context"
@@ -10,6 +10,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/teammachinist/tutuplapak/internal"
 	"github.com/teammachinist/tutuplapak/internal/database"
+	"github.com/teammachinist/tutuplapak/services/auth/internal/model"
+	"github.com/teammachinist/tutuplapak/services/auth/internal/repository"
 
 	"github.com/jackc/pgconn"
 )
@@ -20,12 +22,12 @@ var (
 )
 
 type UserService struct {
-	userRepo   *UserRepository
+	userRepo   *repository.UserRepository
 	jwtService internal.JWTService
 	db         *database.Queries
 }
 
-func NewUserService(userRepo *UserRepository, jwtService internal.JWTService, db *database.Queries) *UserService {
+func NewUserService(userRepo *repository.UserRepository, jwtService internal.JWTService, db *database.Queries) *UserService {
 	return &UserService{
 		userRepo:   userRepo,
 		jwtService: jwtService,
@@ -33,7 +35,7 @@ func NewUserService(userRepo *UserRepository, jwtService internal.JWTService, db
 	}
 }
 
-func (s *UserService) LoginByPhone(ctx context.Context, phone, password string) (*AuthResponse, error) {
+func (s *UserService) LoginByPhone(ctx context.Context, phone, password string) (*model.AuthResponse, error) {
 	// Validate phone format
 	if err := s.validatePhone(phone); err != nil {
 		return nil, err
@@ -51,7 +53,7 @@ func (s *UserService) LoginByPhone(ctx context.Context, phone, password string) 
 	}
 
 	// Check password
-	if !CheckPassword(password, userAuth.PasswordHash) {
+	if !model.CheckPassword(password, userAuth.PasswordHash) {
 		return nil, errors.New("invalid credentials")
 	}
 
@@ -70,14 +72,14 @@ func (s *UserService) LoginByPhone(ctx context.Context, phone, password string) 
 		return nil, errors.New("failed to generate token")
 	}
 
-	return &AuthResponse{
+	return &model.AuthResponse{
 		Email: userAuth.Email,
 		Phone: userAuth.Phone,
 		Token: token,
 	}, nil
 }
 
-func (s *UserService) RegisterByPhone(ctx context.Context, phone, password string) (*AuthResponse, error) {
+func (s *UserService) RegisterByPhone(ctx context.Context, phone, password string) (*model.AuthResponse, error) {
 	// Validate inputs
 	if err := s.validatePhone(phone); err != nil {
 		return nil, err
@@ -96,7 +98,7 @@ func (s *UserService) RegisterByPhone(ctx context.Context, phone, password strin
 	}
 
 	// Hash password
-	passwordHash, err := HashPassword(password)
+	passwordHash, err := model.HashPassword(password)
 	if err != nil {
 		return nil, errors.New("failed to hash password")
 	}
@@ -129,14 +131,14 @@ func (s *UserService) RegisterByPhone(ctx context.Context, phone, password strin
 		return nil, errors.New("failed to generate token")
 	}
 
-	return &AuthResponse{
+	return &model.AuthResponse{
 		Email: userAuth.Email,
 		Phone: userAuth.Phone,
 		Token: token,
 	}, nil
 }
 
-func (s *UserService) LoginWithEmail(ctx context.Context, email, password string) (*AuthResponse, error) {
+func (s *UserService) LoginWithEmail(ctx context.Context, email, password string) (*model.AuthResponse, error) {
 	// Validate email format
 	if err := s.validateEmail(email); err != nil {
 		return nil, err
@@ -154,7 +156,7 @@ func (s *UserService) LoginWithEmail(ctx context.Context, email, password string
 	}
 
 	// Check password
-	if !CheckPassword(password, userAuth.PasswordHash) {
+	if !model.CheckPassword(password, userAuth.PasswordHash) {
 		return nil, errors.New("invalid credentials")
 	}
 
@@ -173,14 +175,14 @@ func (s *UserService) LoginWithEmail(ctx context.Context, email, password string
 		return nil, errors.New("failed to generate token")
 	}
 
-	return &AuthResponse{
+	return &model.AuthResponse{
 		Email: userAuth.Email,
 		Phone: userAuth.Phone,
 		Token: token,
 	}, nil
 }
 
-func (s *UserService) RegisterWithEmail(ctx context.Context, email, password string) (*AuthResponse, error) {
+func (s *UserService) RegisterWithEmail(ctx context.Context, email, password string) (*model.AuthResponse, error) {
 	// Validate email format
 	if err := s.validateEmail(email); err != nil {
 		return nil, err
@@ -201,7 +203,7 @@ func (s *UserService) RegisterWithEmail(ctx context.Context, email, password str
 	}
 
 	// Hash password
-	passwordHash, err := HashPassword(password)
+	passwordHash, err := model.HashPassword(password)
 	if err != nil {
 		return nil, errors.New("failed to hash password")
 	}
@@ -231,7 +233,7 @@ func (s *UserService) RegisterWithEmail(ctx context.Context, email, password str
 		return nil, errors.New("failed to generate token")
 	}
 
-	return &AuthResponse{
+	return &model.AuthResponse{
 		Email: userAuth.Email,
 		Phone: userAuth.Phone,
 		Token: token,

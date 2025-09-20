@@ -1,9 +1,10 @@
-package main
+package repository
 
 import (
 	"context"
 
 	"github.com/teammachinist/tutuplapak/internal/database"
+	"github.com/teammachinist/tutuplapak/services/auth/internal/model"
 )
 
 type UserRepository struct {
@@ -22,13 +23,13 @@ func (r *UserRepository) CheckPhoneExists(ctx context.Context, phone string) (bo
 	return result, nil
 }
 
-func (r *UserRepository) GetUserByPhone(ctx context.Context, phone string) (*UserAuth, error) {
+func (r *UserRepository) GetUserByPhone(ctx context.Context, phone string) (*model.UserAuth, error) {
 	user, err := r.db.GetUserAuthByPhone(ctx, phone)
 	if err != nil {
 		return nil, err
 	}
 
-	return &UserAuth{
+	return &model.UserAuth{
 		ID:           user.ID,
 		Phone:        user.Phone,
 		PasswordHash: user.PasswordHash,
@@ -36,7 +37,7 @@ func (r *UserRepository) GetUserByPhone(ctx context.Context, phone string) (*Use
 	}, nil
 }
 
-func (r *UserRepository) CreateUserByPhone(ctx context.Context, phone, passwordHash string) (*UserAuth, error) {
+func (r *UserRepository) CreateUserByPhone(ctx context.Context, phone, passwordHash string) (*model.UserAuth, error) {
 	params := database.CreateUserAuthParams{
 		Phone:        phone,
 		PasswordHash: passwordHash,
@@ -47,7 +48,7 @@ func (r *UserRepository) CreateUserByPhone(ctx context.Context, phone, passwordH
 		return nil, err
 	}
 
-	return &UserAuth{
+	return &model.UserAuth{
 		ID:           user.ID,
 		Phone:        user.Phone,
 		PasswordHash: user.PasswordHash,
@@ -63,13 +64,13 @@ func (r *UserRepository) CheckExistedUserAuthByEmail(ctx context.Context, email 
 	return result, nil
 }
 
-func (r *UserRepository) GetUserAuthByEmail(ctx context.Context, email string) (*UserAuth, error) {
+func (r *UserRepository) GetUserAuthByEmail(ctx context.Context, email string) (*model.UserAuth, error) {
 	user, err := r.db.GetUserAuthByEmail(ctx, email)
 	if err != nil {
 		return nil, err
 	}
 
-	return &UserAuth{
+	return &model.UserAuth{
 		ID:           user.ID,
 		Email:        user.Email,
 		PasswordHash: user.PasswordHash,
@@ -77,7 +78,7 @@ func (r *UserRepository) GetUserAuthByEmail(ctx context.Context, email string) (
 	}, nil
 }
 
-func (r *UserRepository) RegisterWithEmail(ctx context.Context, email, passwordHash string) (*UserAuth, error) {
+func (r *UserRepository) RegisterWithEmail(ctx context.Context, email, passwordHash string) (*model.UserAuth, error) {
 	params := database.RegisterWithEmailParams{
 		Email:        email,
 		PasswordHash: passwordHash,
@@ -88,7 +89,7 @@ func (r *UserRepository) RegisterWithEmail(ctx context.Context, email, passwordH
 		return nil, err
 	}
 
-	return &UserAuth{
+	return &model.UserAuth{
 		ID:           user.ID,
 		Email:        user.Email,
 		PasswordHash: user.PasswordHash,

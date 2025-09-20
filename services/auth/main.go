@@ -9,6 +9,9 @@ import (
 	"github.com/teammachinist/tutuplapak/internal"
 	"github.com/teammachinist/tutuplapak/internal/cache"
 	"github.com/teammachinist/tutuplapak/internal/logger"
+	"github.com/teammachinist/tutuplapak/services/auth/internal/handler"
+	"github.com/teammachinist/tutuplapak/services/auth/internal/repository"
+	"github.com/teammachinist/tutuplapak/services/auth/internal/service"
 
 	"github.com/caarlos0/env/v8"
 	"github.com/gin-gonic/gin"
@@ -77,10 +80,10 @@ func main() {
 	}
 
 	// Initialize layers
-	userRepo := NewUserRepository(db.Queries)
-	userService := NewUserService(userRepo, *jwtService, db.Queries)
-	userHandler := NewUserHandler(userService)
-	healthHandler := NewHealthHandler(db.Pool, redisCache)
+	userRepo := repository.NewUserRepository(db.Queries)
+	userService := service.NewUserService(userRepo, *jwtService, db.Queries)
+	userHandler := handler.NewUserHandler(userService)
+	healthHandler := handler.NewHealthHandler(db.Pool, redisCache)
 
 	router := gin.Default()
 	router.SetTrustedProxies(nil)

@@ -1,22 +1,24 @@
-package main
+package handler
 
 import (
 	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/teammachinist/tutuplapak/services/auth/internal/model"
+	"github.com/teammachinist/tutuplapak/services/auth/internal/service"
 )
 
 type UserHandler struct {
-	userService *UserService
+	userService *service.UserService
 }
 
-func NewUserHandler(userService *UserService) *UserHandler {
+func NewUserHandler(userService *service.UserService) *UserHandler {
 	return &UserHandler{userService: userService}
 }
 
 func (h *UserHandler) LoginByPhone(c *gin.Context) {
-	var req PhoneAuthRequest
+	var req model.PhoneAuthRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
@@ -48,7 +50,7 @@ func (h *UserHandler) LoginByPhone(c *gin.Context) {
 
 func (h *UserHandler) RegisterByPhone(c *gin.Context) {
 	fmt.Println("Handler: RegisterByPhone")
-	var req PhoneAuthRequest
+	var req model.PhoneAuthRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
@@ -78,7 +80,7 @@ func (h *UserHandler) RegisterByPhone(c *gin.Context) {
 
 func (h *UserHandler) LoginWithEmail(c *gin.Context) {
 	fmt.Println("Handler: LoginWithEmail")
-	var req EmailAuthRequest
+	var req model.EmailAuthRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
@@ -108,7 +110,7 @@ func (h *UserHandler) LoginWithEmail(c *gin.Context) {
 
 func (h *UserHandler) RegisterWithEmail(c *gin.Context) {
 	fmt.Println("Handler: RegisterWithEmail")
-	var req EmailAuthRequest
+	var req model.EmailAuthRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
