@@ -48,6 +48,7 @@ type Config struct {
 type Dependencies struct {
 	DB         *database.DB
 	RedisCache *cache.RedisCache
+	// TODO: Use authz package
 	JWTService *internal.JWTService
 	MinIO      *storage.MinIOStorage
 }
@@ -126,6 +127,7 @@ func setupDependencies(cfg Config) Dependencies {
 		logger.Warn("Redis connection failed - running without cache", "error", err)
 	}
 
+	// TODO: Use authz package
 	// Initialize JWT service
 	jwtConfig := &internal.JWTConfig{
 		Key:      cfg.JWTSecret,

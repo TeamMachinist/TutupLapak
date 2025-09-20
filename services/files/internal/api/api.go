@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/teammachinist/tutuplapak/internal/logger"
+	"github.com/teammachinist/tutuplapak/services/files/internal/logger"
 )
 
 // Validation errors (only for validation failed responses)

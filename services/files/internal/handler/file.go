@@ -50,7 +50,7 @@ func (h *FileHandler) DeleteFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: wrap authClient
+	// TODO: Use authz package
 	// Get user ID from auth middleware
 	userID, ok := internal.GetUserIDFromChi(r)
 	if !ok {
@@ -174,7 +174,7 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 
 	logger.InfoCtx(requestCtx, "File upload request started")
 
-	// TODO: wrap authClient
+	// TODO: Use authz package
 	// // Get user ID from auth middleware context
 	userID, ok := internal.GetUserIDFromChi(r)
 	if !ok {

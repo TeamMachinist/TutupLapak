@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/teammachinist/tutuplapak/services/files/internal/logger"
+
 	"github.com/redis/go-redis/v9"
-	"github.com/teammachinist/tutuplapak/internal/logger"
 )
 
 type RedisCache struct {
