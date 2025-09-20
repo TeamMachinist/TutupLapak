@@ -158,7 +158,7 @@ WHERE
     AND p.category = COALESCE(NULLIF($3::text, ''), p.category)
 ORDER BY 
     CASE WHEN $4::text = 'newest' THEN GREATEST(p.created_at, p.updated_at) END DESC,
-    CASE WHEN $4::text = 'oldest' THEN GREATEST(p.created_at, p.updated_at) END ASC,
+    CASE WHEN $4::text = 'oldest' THEN LEAST(p.created_at, p.updated_at) END ASC,
     CASE WHEN $4::text = 'cheapest' THEN p.price END ASC,
     CASE WHEN $4::text = 'expensive' THEN p.price END DESC,
     p.created_at DESC
@@ -336,18 +336,18 @@ func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) (U
 }
 
 const updateProductQty = `-- name: UpdateProductQty :execrows
-UPDATE products 
-SET qty = qty - $2 
-WHERE id = $1
+UPDATE products
+SET qty = qty - $1::int
+WHERE id = $2::uuid AND qty >= $1::int
 `
 
 type UpdateProductQtyParams struct {
-	ID  uuid.UUID `json:"id"`
 	Qty int       `json:"qty"`
+	ID  uuid.UUID `json:"id"`
 }
 
 func (q *Queries) UpdateProductQty(ctx context.Context, arg UpdateProductQtyParams) (int64, error) {
-	result, err := q.db.Exec(ctx, updateProductQty, arg.ID, arg.Qty)
+	result, err := q.db.Exec(ctx, updateProductQty, arg.Qty, arg.ID)
 	if err != nil {
 		return 0, err
 	}

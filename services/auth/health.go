@@ -33,7 +33,7 @@ func (h *HealthHandler) HealthCheck(c *gin.Context) {
 	defer cancel()
 
 	health := HealthCheck{
-		Status:   "ok",
+		Status:   "healthy",
 		Version:  "1.0.0",
 		Services: make(map[string]string),
 	}

@@ -4,7 +4,13 @@
 # - Use down-reset to get fresh database with migrations
 # - up-prod is for local production testing only (K8s doesn't use compose)
 
-.PHONY: up-dev up-dev-build up-prod up-db up-auth up-auth-build up-core up-core-build up-files up-files-build down-dev down-reset down-clean seed-dev
+.PHONY: tidy-deps up-dev up-dev-build up-prod up-db up-auth up-auth-build up-core up-core-build up-files up-files-build down-dev down-reset down-clean seed-dev
+
+tidy-deps:
+	cd services/auth && go mod tidy
+	cd services/core && go mod tidy  
+	cd services/files && go mod tidy
+	go mod tidy
 
 # Start commands
 up-dev: # Start all services in compose.dev.yml

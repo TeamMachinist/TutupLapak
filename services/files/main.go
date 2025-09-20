@@ -175,7 +175,7 @@ func setupRoutes(services Services, deps Dependencies) *chi.Mux {
 	r.Use(middleware.Timeout(30 * time.Second))
 	r.Use(requestLoggerMiddleware)
 
-	// Static files
+	// Static files -> What does it serve?
 	fs := http.FileServer(http.Dir("static"))
 	r.Handle("/static/*", http.StripPrefix("/static/", fs))
 
@@ -184,6 +184,7 @@ func setupRoutes(services Services, deps Dependencies) *chi.Mux {
 
 	// Pragmatically no auth for now, to ease fetch by core service (purchase)
 	r.Get("/api/v1/file/{fileId}", services.FileHandler.GetFile)
+	r.Get("/api/v1/file", services.FileHandler.GetFiles)
 
 	// API routes with authentication
 	r.Route("/api/v1", func(r chi.Router) {

@@ -23,6 +23,10 @@ import (
 func main() {
 	ctx := context.Background()
 
+	// Initialize logger
+	logger.Init()
+	logger.Info("Starting Core service")
+
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatal("Failed to load config:", err)
@@ -47,6 +51,7 @@ func main() {
 	app := fiber.New(fiber.Config{
 		Prefork: enablePrefork,
 		AppName: "Core Service v1.0",
+		Network: "tcp",
 	})
 
 	app.Use(fiberlog.New())
@@ -68,11 +73,11 @@ func main() {
 	fileClient := clients.NewFileClient(cfg.App.FileUrl)
 
 	productRepo := repositories.NewProductRepository(database.Queries)
-	purchaseRepo := repositories.NewPurchaseRepository(database.Pool)
+	purchaseRepo := repositories.NewPurchaseRepository(database.Pool, database.Queries)
 	userRepo := repositories.NewUserRepository(database.Queries)
 
 	productService := services.NewProductService(productRepo, fileClient, redisClient)
-	purchaseService := services.NewPurchaseService(purchaseRepo, fileClient)
+	purchaseService := services.NewPurchaseService(purchaseRepo, productRepo, fileClient)
 	userService := services.NewUserService(userRepo, fileClient, redisClient)
 
 	productHandler := handlers.NewProductHandler(productService)
@@ -81,7 +86,7 @@ func main() {
 
 	api := app.Group("/api/v1")
 
-	products := api.Group("/products")
+	products := api.Group("/product")
 	{
 		products.Get("", productHandler.GetAllProducts)
 		products.Post("", jwtService.FiberMiddleware(), productHandler.CreateProduct)
@@ -102,6 +107,7 @@ func main() {
 	purchase := api.Group("/purchase")
 	{
 		purchase.Post("", purchaseHandler.CreatePurchase)
+		purchase.Post("/:purchaseId", purchaseHandler.UploadPaymentProof)
 	}
 
 	c := make(chan os.Signal, 1)
