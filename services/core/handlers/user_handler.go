@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -198,7 +197,6 @@ func (h *UserHandler) GetUserWithFileId(c *fiber.Ctx) error {
 			"error": "invalid user id in token",
 		})
 	}
-	fmt.Printf("masuk handler: %s", userID.String())
 
 	ctx := c.Context()
 	rows, err := h.userService.GetUserWithFileId(ctx, userID)
@@ -241,11 +239,13 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 		})
 	}
 
-	if err := uuid.Validate(*req.FileID); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error":   "Validation error",
-			"details": "fileId is not valid",
-		})
+	if req.FileID != nil {
+		if err := uuid.Validate(*req.FileID); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error":   "Validation error",
+				"details": "fileId is not valid",
+			})
+		}
 	}
 
 	validate := validator.New()
@@ -273,10 +273,6 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 	rows, err := h.userService.UpdateUser(ctx, userID, req)
 	if err != nil {
 		switch err.Error() {
-		// case "user not found or invalid token":
-		// 	return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
-		// 		"error": "Invalid or expired token",
-		// 	})
 		case "file not found":
 			return c.Status(http.StatusBadRequest).JSON(fiber.Map{
 				"error": "fileId is not valid / exists",
