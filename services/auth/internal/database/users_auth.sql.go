@@ -12,12 +12,12 @@ import (
 	"github.com/google/uuid"
 )
 
-const checkExistedUserAuthByEmail = `-- name: CheckExistedUserAuthByEmail :one
+const checkEmailExists = `-- name: CheckEmailExists :one
 SELECT EXISTS(SELECT 1 FROM users_auth WHERE email = $1) as exists
 `
 
-func (q *Queries) CheckExistedUserAuthByEmail(ctx context.Context, email string) (bool, error) {
-	row := q.db.QueryRow(ctx, checkExistedUserAuthByEmail, email)
+func (q *Queries) CheckEmailExists(ctx context.Context, email string) (bool, error) {
+	row := q.db.QueryRow(ctx, checkEmailExists, email)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
@@ -34,23 +34,23 @@ func (q *Queries) CheckPhoneExists(ctx context.Context, phone string) (bool, err
 	return exists, err
 }
 
-const createUserAuth = `-- name: CreateUserAuth :one
-INSERT INTO users_auth (phone, password_hash)
+const createUserByEmail = `-- name: CreateUserByEmail :one
+INSERT INTO users_auth (email, password_hash)
 VALUES ($1, $2)
 RETURNING 
     id, 
-    COALESCE(email, '') as email,     -- return empty string instead of NULL
-    COALESCE(phone, '') as phone,     -- return empty string instead of NULL       
+    COALESCE(email, '') as email,
+    COALESCE(phone, '') as phone,       
     password_hash, 
     created_at
 `
 
-type CreateUserAuthParams struct {
-	Phone        string `json:"phone"`
+type CreateUserByEmailParams struct {
+	Email        string `json:"email"`
 	PasswordHash string `json:"password_hash"`
 }
 
-type CreateUserAuthRow struct {
+type CreateUserByEmailRow struct {
 	ID           uuid.UUID `json:"id"`
 	Email        string    `json:"email"`
 	Phone        string    `json:"phone"`
@@ -58,9 +58,46 @@ type CreateUserAuthRow struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
-func (q *Queries) CreateUserAuth(ctx context.Context, arg CreateUserAuthParams) (CreateUserAuthRow, error) {
-	row := q.db.QueryRow(ctx, createUserAuth, arg.Phone, arg.PasswordHash)
-	var i CreateUserAuthRow
+func (q *Queries) CreateUserByEmail(ctx context.Context, arg CreateUserByEmailParams) (CreateUserByEmailRow, error) {
+	row := q.db.QueryRow(ctx, createUserByEmail, arg.Email, arg.PasswordHash)
+	var i CreateUserByEmailRow
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Phone,
+		&i.PasswordHash,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const createUserByPhone = `-- name: CreateUserByPhone :one
+INSERT INTO users_auth (phone, password_hash)
+VALUES ($1, $2)
+RETURNING 
+    id, 
+    COALESCE(email, '') as email,
+    COALESCE(phone, '') as phone,       
+    password_hash, 
+    created_at
+`
+
+type CreateUserByPhoneParams struct {
+	Phone        string `json:"phone"`
+	PasswordHash string `json:"password_hash"`
+}
+
+type CreateUserByPhoneRow struct {
+	ID           uuid.UUID `json:"id"`
+	Email        string    `json:"email"`
+	Phone        string    `json:"phone"`
+	PasswordHash string    `json:"password_hash"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+func (q *Queries) CreateUserByPhone(ctx context.Context, arg CreateUserByPhoneParams) (CreateUserByPhoneRow, error) {
+	row := q.db.QueryRow(ctx, createUserByPhone, arg.Phone, arg.PasswordHash)
+	var i CreateUserByPhoneRow
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
@@ -103,6 +140,38 @@ func (q *Queries) GetUserAuthByEmail(ctx context.Context, email string) (GetUser
 	return i, err
 }
 
+const getUserAuthByID = `-- name: GetUserAuthByID :one
+SELECT
+    id,
+    COALESCE(email, '') as email,
+    COALESCE(phone, '') as phone,
+    password_hash,
+    created_at
+FROM users_auth
+WHERE id = $1
+`
+
+type GetUserAuthByIDRow struct {
+	ID           uuid.UUID `json:"id"`
+	Email        string    `json:"email"`
+	Phone        string    `json:"phone"`
+	PasswordHash string    `json:"password_hash"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+func (q *Queries) GetUserAuthByID(ctx context.Context, id uuid.UUID) (GetUserAuthByIDRow, error) {
+	row := q.db.QueryRow(ctx, getUserAuthByID, id)
+	var i GetUserAuthByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Phone,
+		&i.PasswordHash,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getUserAuthByPhone = `-- name: GetUserAuthByPhone :one
 SELECT
     id,
@@ -125,43 +194,6 @@ type GetUserAuthByPhoneRow struct {
 func (q *Queries) GetUserAuthByPhone(ctx context.Context, phone string) (GetUserAuthByPhoneRow, error) {
 	row := q.db.QueryRow(ctx, getUserAuthByPhone, phone)
 	var i GetUserAuthByPhoneRow
-	err := row.Scan(
-		&i.ID,
-		&i.Email,
-		&i.Phone,
-		&i.PasswordHash,
-		&i.CreatedAt,
-	)
-	return i, err
-}
-
-const registerWithEmail = `-- name: RegisterWithEmail :one
-INSERT INTO users_auth (email, password_hash)
-VALUES ($1, $2)
-RETURNING
-    id,
-    COALESCE(email, '') as email,     -- return empty string instead of NULL
-    COALESCE(phone, '') as phone,     -- return empty string instead of NULL
-    password_hash,
-    created_at
-`
-
-type RegisterWithEmailParams struct {
-	Email        string `json:"email"`
-	PasswordHash string `json:"password_hash"`
-}
-
-type RegisterWithEmailRow struct {
-	ID           uuid.UUID `json:"id"`
-	Email        string    `json:"email"`
-	Phone        string    `json:"phone"`
-	PasswordHash string    `json:"password_hash"`
-	CreatedAt    time.Time `json:"created_at"`
-}
-
-func (q *Queries) RegisterWithEmail(ctx context.Context, arg RegisterWithEmailParams) (RegisterWithEmailRow, error) {
-	row := q.db.QueryRow(ctx, registerWithEmail, arg.Email, arg.PasswordHash)
-	var i RegisterWithEmailRow
 	err := row.Scan(
 		&i.ID,
 		&i.Email,

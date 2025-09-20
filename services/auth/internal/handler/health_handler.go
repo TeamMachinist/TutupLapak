@@ -5,9 +5,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/teammachinist/tutuplapak/services/auth/internal/cache"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/teammachinist/tutuplapak/internal/cache"
 )
 
 type HealthCheck struct {

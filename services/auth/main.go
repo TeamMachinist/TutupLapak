@@ -7,9 +7,10 @@ import (
 	"time"
 
 	"github.com/teammachinist/tutuplapak/internal"
-	"github.com/teammachinist/tutuplapak/internal/cache"
-	"github.com/teammachinist/tutuplapak/internal/logger"
+	"github.com/teammachinist/tutuplapak/services/auth/internal/cache"
+	"github.com/teammachinist/tutuplapak/services/auth/internal/database"
 	"github.com/teammachinist/tutuplapak/services/auth/internal/handler"
+	"github.com/teammachinist/tutuplapak/services/auth/internal/logger"
 	"github.com/teammachinist/tutuplapak/services/auth/internal/repository"
 	"github.com/teammachinist/tutuplapak/services/auth/internal/service"
 
@@ -46,13 +47,14 @@ func main() {
 
 	// Initialize database
 	ctx := context.Background()
-	db, err := internal.NewDatabase(ctx, cfg.DatabaseURL)
+	db, err := database.NewDatabase(ctx, cfg.DatabaseURL)
 	if err != nil {
 		log.Printf("Database connection failed: %v", err)
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
 
+	// TODO: Use authz package
 	// Initialize JWT service
 	jwtConfig := &internal.JWTConfig{
 		Key:      cfg.JWTSecret,

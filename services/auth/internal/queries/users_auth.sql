@@ -1,3 +1,4 @@
+-- name: GetUserAuthByID :one
 SELECT
     id,
     COALESCE(email, '') as email,
@@ -7,13 +8,13 @@ SELECT
 FROM users_auth
 WHERE id = $1;
 
--- name: CreateUserAuth :one
+-- name: CreateUserByPhone :one
 INSERT INTO users_auth (phone, password_hash)
 VALUES ($1, $2)
 RETURNING 
     id, 
-    COALESCE(email, '') as email,     -- return empty string instead of NULL
-    COALESCE(phone, '') as phone,     -- return empty string instead of NULL       
+    COALESCE(email, '') as email,
+    COALESCE(phone, '') as phone,       
     password_hash, 
     created_at;
 
@@ -30,14 +31,14 @@ WHERE phone = $1;
 -- name: CheckPhoneExists :one
 SELECT EXISTS(SELECT 1 FROM users_auth WHERE phone = $1) as exists;
 
--- name: RegisterWithEmail :one
+-- name: CreateUserByEmail :one
 INSERT INTO users_auth (email, password_hash)
 VALUES ($1, $2)
-RETURNING
-    id,
-    COALESCE(email, '') as email,     -- return empty string instead of NULL
-    COALESCE(phone, '') as phone,     -- return empty string instead of NULL
-    password_hash,
+RETURNING 
+    id, 
+    COALESCE(email, '') as email,
+    COALESCE(phone, '') as phone,       
+    password_hash, 
     created_at;
 
 -- name: GetUserAuthByEmail :one
@@ -50,6 +51,5 @@ SELECT
 FROM users_auth
 WHERE email = $1;
 
-
--- name: CheckExistedUserAuthByEmail :one
+-- name: CheckEmailExists :one
 SELECT EXISTS(SELECT 1 FROM users_auth WHERE email = $1) as exists;

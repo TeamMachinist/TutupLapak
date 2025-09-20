@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"github.com/teammachinist/tutuplapak/internal/database"
+	"github.com/teammachinist/tutuplapak/services/auth/internal/database"
 	"github.com/teammachinist/tutuplapak/services/auth/internal/model"
 )
 
@@ -38,12 +38,12 @@ func (r *UserRepository) GetUserByPhone(ctx context.Context, phone string) (*mod
 }
 
 func (r *UserRepository) CreateUserByPhone(ctx context.Context, phone, passwordHash string) (*model.UserAuth, error) {
-	params := database.CreateUserAuthParams{
+	params := database.CreateUserByPhoneParams{
 		Phone:        phone,
 		PasswordHash: passwordHash,
 	}
 
-	user, err := r.db.CreateUserAuth(ctx, params)
+	user, err := r.db.CreateUserByPhone(ctx, params)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func (r *UserRepository) CreateUserByPhone(ctx context.Context, phone, passwordH
 }
 
 func (r *UserRepository) CheckExistedUserAuthByEmail(ctx context.Context, email string) (bool, error) {
-	result, err := r.db.CheckExistedUserAuthByEmail(ctx, email)
+	result, err := r.db.CheckEmailExists(ctx, email)
 	if err != nil {
 		return false, err
 	}
@@ -79,12 +79,12 @@ func (r *UserRepository) GetUserAuthByEmail(ctx context.Context, email string) (
 }
 
 func (r *UserRepository) RegisterWithEmail(ctx context.Context, email, passwordHash string) (*model.UserAuth, error) {
-	params := database.RegisterWithEmailParams{
+	params := database.CreateUserByEmailParams{
 		Email:        email,
 		PasswordHash: passwordHash,
 	}
 
-	user, err := r.db.RegisterWithEmail(ctx, params)
+	user, err := r.db.CreateUserByEmail(ctx, params)
 	if err != nil {
 		return nil, err
 	}

@@ -3,13 +3,11 @@ package service
 import (
 	"context"
 	"errors"
-	"fmt"
 	"regexp"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/teammachinist/tutuplapak/internal"
-	"github.com/teammachinist/tutuplapak/internal/database"
+	"github.com/teammachinist/tutuplapak/services/auth/internal/database"
 	"github.com/teammachinist/tutuplapak/services/auth/internal/model"
 	"github.com/teammachinist/tutuplapak/services/auth/internal/repository"
 
@@ -22,7 +20,8 @@ var (
 )
 
 type UserService struct {
-	userRepo   *repository.UserRepository
+	userRepo *repository.UserRepository
+	// TODO: Use authz package
 	jwtService internal.JWTService
 	db         *database.Queries
 }
@@ -57,17 +56,12 @@ func (s *UserService) LoginByPhone(ctx context.Context, phone, password string) 
 		return nil, errors.New("invalid credentials")
 	}
 
-	fmt.Println("----------------")
-	fmt.Printf("userAuth: %+v\n", userAuth)
-
-	// Get user, hit db directly for development purpose
-	user, err := s.db.GetUserByAuthID(ctx, userAuth.ID)
-
-	fmt.Printf("user: %+v\n", user)
-	fmt.Println("----------------")
+	// // TODO: Opt 1 - Call user service to get users(id)
+	// // TODO: Opt 2 - Put users_auth(id) to token
+	// user, err := s.db.GetUserAuthByID(ctx, userAuth.ID)
 
 	// Generate JWT token
-	token, err := s.jwtService.GenerateToken(user.ID.String())
+	token, err := s.jwtService.GenerateToken(userAuth.ID.String())
 	if err != nil {
 		return nil, errors.New("failed to generate token")
 	}
@@ -115,18 +109,18 @@ func (s *UserService) RegisterByPhone(ctx context.Context, phone, password strin
 		return nil, err
 	}
 
-	// Create user, hit db directly for development purpose
-	user, err := s.db.CreateUser(ctx, database.CreateUserParams{
-		ID:         uuid.New(),
-		UserAuthID: userAuth.ID,
-		Phone:      userAuth.Phone,
-	})
-	if err != nil {
-		return nil, errors.New("failed to create user")
-	}
+	// // TODO: Call user service to create new user
+	// user, err := s.db.CreateUserByPhone(ctx, database.CreateUserByPhoneParams{
+	// 	ID:         uuid.New(),
+	// 	UserAuthID: userAuth.ID,
+	// 	Phone:      userAuth.Phone,
+	// })
+	// if err != nil {
+	// 	return nil, errors.New("failed to create user")
+	// }
 
 	// Generate token
-	token, err := s.jwtService.GenerateToken(user.ID.String())
+	token, err := s.jwtService.GenerateToken(userAuth.ID.String())
 	if err != nil {
 		return nil, errors.New("failed to generate token")
 	}
@@ -160,17 +154,12 @@ func (s *UserService) LoginWithEmail(ctx context.Context, email, password string
 		return nil, errors.New("invalid credentials")
 	}
 
-	fmt.Println("----------------")
-	fmt.Printf("userAuth: %+v\n", userAuth)
-
-	// Get user, hit db directly for development purpose
-	user, err := s.db.GetUserByAuthID(ctx, userAuth.ID)
-
-	fmt.Printf("user: %+v\n", user)
-	fmt.Println("----------------")
+	// // TODO: Opt 1 - Call user service to get users(id)
+	// // TODO: Opt 2 - Put users_auth(id) to token
+	// user, err := s.db.GetUserAuthByID(ctx, userAuth.ID)
 
 	// Generate JWT token
-	token, err := s.jwtService.GenerateToken(user.ID.String())
+	token, err := s.jwtService.GenerateToken(userAuth.ID.String())
 	if err != nil {
 		return nil, errors.New("failed to generate token")
 	}
@@ -220,15 +209,18 @@ func (s *UserService) RegisterWithEmail(ctx context.Context, email, password str
 		return nil, err
 	}
 
-	// Create user, hit db directly for development purpose
-	user, err := s.db.CreateUser(ctx, database.CreateUserParams{
-		ID:         uuid.New(),
-		UserAuthID: userAuth.ID,
-		Email:      userAuth.Email,
-	})
+	// // TODO: Call user service to create new user
+	// user, err := s.db.CreateUserByEmail(ctx, database.CreateUserByEmailParams{
+	// 	ID:         uuid.New(),
+	// 	UserAuthID: userAuth.ID,
+	// 	Email:      userAuth.Email,
+	// })
+	// if err != nil {
+	// 	return nil, errors.New("failed to create user")
+	// }
 
 	// Generate token
-	token, err := s.jwtService.GenerateToken(user.ID.String())
+	token, err := s.jwtService.GenerateToken(userAuth.ID.String())
 	if err != nil {
 		return nil, errors.New("failed to generate token")
 	}

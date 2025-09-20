@@ -6,15 +6,18 @@ package database
 
 import (
 	"context"
+
+	"github.com/google/uuid"
 )
 
 type Querier interface {
-	CheckExistedUserAuthByEmail(ctx context.Context, email string) (bool, error)
+	CheckEmailExists(ctx context.Context, email string) (bool, error)
 	CheckPhoneExists(ctx context.Context, phone string) (bool, error)
-	CreateUserAuth(ctx context.Context, arg CreateUserAuthParams) (CreateUserAuthRow, error)
+	CreateUserByEmail(ctx context.Context, arg CreateUserByEmailParams) (CreateUserByEmailRow, error)
+	CreateUserByPhone(ctx context.Context, arg CreateUserByPhoneParams) (CreateUserByPhoneRow, error)
 	GetUserAuthByEmail(ctx context.Context, email string) (GetUserAuthByEmailRow, error)
+	GetUserAuthByID(ctx context.Context, id uuid.UUID) (GetUserAuthByIDRow, error)
 	GetUserAuthByPhone(ctx context.Context, phone string) (GetUserAuthByPhoneRow, error)
-	RegisterWithEmail(ctx context.Context, arg RegisterWithEmailParams) (RegisterWithEmailRow, error)
 }
 
 var _ Querier = (*Queries)(nil)
