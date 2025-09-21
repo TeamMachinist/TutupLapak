@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/teammachinist/tutuplapak/internal"
+	"github.com/teammachinist/tutuplapak/services/auth/pkg/authz"
 	"github.com/teammachinist/tutuplapak/services/files/internal/cache"
 	"github.com/teammachinist/tutuplapak/services/files/internal/database"
 	"github.com/teammachinist/tutuplapak/services/files/internal/handler"
@@ -23,8 +23,9 @@ import (
 )
 
 type Config struct {
-	HTTPPort    string `env:"PORT" envDefault:"8003"`
-	DatabaseURL string `env:"DATABASE_URL" envDefault:""`
+	HTTPPort       string `env:"PORT" envDefault:"8003"`
+	DatabaseURL    string `env:"DATABASE_URL" envDefault:""`
+	AuthServiceURL string `env:"AUTH_SERVICE_URL" envDefault:""`
 
 	// JWT Configuration
 	JWTSecret   string        `env:"JWT_SECRET" envDefault:"tutupsecret"`
@@ -46,16 +47,17 @@ type Config struct {
 }
 
 type Dependencies struct {
-	DB         *database.DB
-	RedisCache *cache.RedisCache
-	// TODO: Use authz package
-	JWTService *internal.JWTService
-	MinIO      *storage.MinIOStorage
+	DB             *database.DB
+	RedisCache     *cache.RedisCache
+	AuthClient     *authz.AuthClient
+	AuthMiddleware *authz.AuthMiddleware
+	MinIO          *storage.MinIOStorage
 }
 
 type Services struct {
-	FileService service.FileService
-	FileHandler *handler.FileHandler
+	FileService   service.FileService
+	FileHandler   *handler.FileHandler
+	HealthHandler *handler.HealthHandler
 }
 
 func main() {
@@ -127,15 +129,9 @@ func setupDependencies(cfg Config) Dependencies {
 		logger.Warn("Redis connection failed - running without cache", "error", err)
 	}
 
-	// TODO: Use authz package
-	// Initialize JWT service
-	jwtConfig := &internal.JWTConfig{
-		Key:      cfg.JWTSecret,
-		Duration: cfg.JWTDuration,
-		Issuer:   cfg.JWTIssuer,
-	}
-	jwtService := internal.NewJWTService(jwtConfig)
-	logger.Info("JWT service initialized", "issuer", cfg.JWTIssuer, "duration", cfg.JWTDuration)
+	// Initialize authz middleware and client
+	authClient := authz.NewAuthClient(cfg.AuthServiceURL)
+	authMiddleware := authz.NewAuthMiddleware(cfg.AuthServiceURL)
 
 	// Initialize MinIO storage
 	minioConfig := &storage.MinIOConfig{
@@ -155,20 +151,23 @@ func setupDependencies(cfg Config) Dependencies {
 	logger.Info("MinIO storage initialized", "endpoint", cfg.MinIOEndpoint, "bucket", cfg.MinIOBucket)
 
 	return Dependencies{
-		DB:         db,
-		RedisCache: redisCache,
-		JWTService: jwtService,
-		MinIO:      minioStorage,
+		DB:             db,
+		RedisCache:     redisCache,
+		AuthClient:     authClient,
+		AuthMiddleware: authMiddleware,
+		MinIO:          minioStorage,
 	}
 }
 
 func setupServices(deps Dependencies) Services {
 	fileService := service.NewFileService(deps.DB.Queries, deps.RedisCache)
 	fileHandler := handler.NewFileHandler(deps.MinIO, fileService)
+	healthHandler := handler.NewHealthHandler(deps.DB, deps.RedisCache)
 
 	return Services{
-		FileService: fileService,
-		FileHandler: fileHandler,
+		FileService:   fileService,
+		FileHandler:   fileHandler,
+		HealthHandler: healthHandler,
 	}
 }
 
@@ -186,15 +185,17 @@ func setupRoutes(services Services, deps Dependencies) *chi.Mux {
 	r.Handle("/static/*", http.StripPrefix("/static/", fs))
 
 	// Health check (no auth required)
-	r.Get("/healthz", healthHandler(deps.DB, deps.RedisCache))
+	r.Get("/healthz", services.HealthHandler.HealthCheck)
+	r.Get("/readyz", services.HealthHandler.ReadinessCheck)
 
-	// Pragmatically no auth for now, to ease fetch by core service (purchase)
+	// Pragmatically no auth for now, easier fetch for user and core services
+	// Can be changed to use `internal` prefix later, follow auth service design
 	r.Get("/api/v1/file/{fileId}", services.FileHandler.GetFile)
 	r.Get("/api/v1/file", services.FileHandler.GetFiles)
 
 	// API routes with authentication
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Use(deps.JWTService.ChiMiddleware)
+		r.Use(deps.AuthMiddleware.ChiMiddleware)
 		r.Post("/file", services.FileHandler.UploadFile)
 		// r.Get("/file/{fileId}", services.FileHandler.GetFile)
 		r.Delete("/file/{fileId}", services.FileHandler.DeleteFile)

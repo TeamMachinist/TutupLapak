@@ -12,11 +12,7 @@ import (
 )
 
 const createFile = `-- name: CreateFile :one
-INSERT INTO files (
-  id, user_id, file_uri, file_thumbnail_uri
-) VALUES (
-  $1, $2, $3, $4
-) RETURNING id, user_id, file_uri, file_thumbnail_uri, created_at
+INSERT INTO files (id, user_id, file_uri, file_thumbnail_uri) VALUES ($1, $2, $3, $4) RETURNING id, user_id, file_uri, file_thumbnail_uri, created_at
 `
 
 type CreateFileParams struct {

@@ -2,11 +2,7 @@
 SELECT * FROM files WHERE id = $1;
 
 -- name: CreateFile :one
-INSERT INTO files (
-  id, user_id, file_uri, file_thumbnail_uri
-) VALUES (
-  $1, $2, $3, $4
-) RETURNING *;
+INSERT INTO files (id, user_id, file_uri, file_thumbnail_uri) VALUES ($1, $2, $3, $4) RETURNING *;
 
 -- name: GetFilesByUserID :many
 SELECT * FROM files WHERE user_id = $1;

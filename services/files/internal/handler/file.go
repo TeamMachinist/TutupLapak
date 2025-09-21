@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/teammachinist/tutuplapak/internal"
+	"github.com/teammachinist/tutuplapak/services/auth/pkg/authz"
 	"github.com/teammachinist/tutuplapak/services/files/internal/api"
 	"github.com/teammachinist/tutuplapak/services/files/internal/logger"
 	"github.com/teammachinist/tutuplapak/services/files/internal/model"
@@ -50,9 +50,8 @@ func (h *FileHandler) DeleteFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Use authz package
-	// Get user ID from auth middleware
-	userID, ok := internal.GetUserIDFromChi(r)
+	// Get user ID from authz middleware
+	userID, ok := authz.GetUserIDFromChi(r)
 	if !ok {
 		logger.ErrorCtx(ctx, "Missing user ID from auth context")
 		api.WriteUnauthorized(w, r, "Unauthorized")
@@ -174,9 +173,8 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 
 	logger.InfoCtx(requestCtx, "File upload request started")
 
-	// TODO: Use authz package
-	// // Get user ID from auth middleware context
-	userID, ok := internal.GetUserIDFromChi(r)
+	// Get user ID from authz middleware
+	userID, ok := authz.GetUserIDFromChi(r)
 	if !ok {
 		logger.ErrorCtx(requestCtx, "Missing user ID from auth context")
 		api.WriteUnauthorized(w, r, "Unauthorized")
