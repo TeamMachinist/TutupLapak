@@ -5,11 +5,7 @@ RUN go install github.com/air-verse/air@latest
 
 WORKDIR /app
 
-# Copy root go.mod and internal/ first (context is root directory)
-COPY go.mod go.sum ./
-COPY internal/ internal/
-
-# Copy service directory
+# Copy only the service directory (context is root directory)
 COPY services/auth/ services/auth/
 
 # Move to service directory and download dependencies

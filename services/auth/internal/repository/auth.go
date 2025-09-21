@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/teammachinist/tutuplapak/services/auth/internal/database"
 	"github.com/teammachinist/tutuplapak/services/auth/internal/model"
 )
@@ -95,4 +96,25 @@ func (r *UserRepository) RegisterWithEmail(ctx context.Context, email, passwordH
 		PasswordHash: user.PasswordHash,
 		CreatedAt:    user.CreatedAt,
 	}, nil
+}
+
+func (r *UserRepository) DeleteUserAuth(ctx context.Context, userAuthID uuid.UUID) error {
+	err := r.db.DeleteUserAuth(ctx, userAuthID)
+	return err
+}
+
+func (r *UserRepository) UpdateUserAuthPhone(ctx context.Context, userAuthID uuid.UUID, phone string) error {
+	_, err := r.db.UpdateUserAuthPhone(ctx, database.UpdateUserAuthPhoneParams{
+		ID:    userAuthID,
+		Phone: phone,
+	})
+	return err
+}
+
+func (r *UserRepository) UpdateUserAuthEmail(ctx context.Context, userAuthID uuid.UUID, email string) error {
+	_, err := r.db.UpdateUserAuthEmail(ctx, database.UpdateUserAuthEmailParams{
+		ID:    userAuthID,
+		Email: email,
+	})
+	return err
 }

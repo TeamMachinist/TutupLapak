@@ -12,7 +12,7 @@ type UserAuth struct {
 	ID           uuid.UUID `json:"id"`
 	Email        string    `json:"email"`
 	Phone        string    `json:"phone"`
-	PasswordHash string    `json:"-"`
+	PasswordHash string    `json:"password_hash"`
 	CreatedAt    time.Time `json:"created_at"`
 }
 

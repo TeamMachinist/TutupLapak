@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
-	"github.com/teammachinist/tutuplapak/internal"
 	"github.com/teammachinist/tutuplapak/services/auth/internal/cache"
 	"github.com/teammachinist/tutuplapak/services/auth/internal/database"
 	"github.com/teammachinist/tutuplapak/services/auth/internal/handler"
@@ -20,8 +23,9 @@ import (
 )
 
 type Config struct {
-	HTTPPort    string `env:"PORT" envDefault:"8001"`
-	DatabaseURL string `env:"DATABASE_URL" envDefault:""`
+	HTTPPort       string `env:"PORT" envDefault:"8001"`
+	DatabaseURL    string `env:"DATABASE_URL" envDefault:""`
+	CoreServiceURL string `env:"CORE_SERVICE_URL" envDefault:""`
 
 	// JWT Configuration
 	JWTSecret   string        `env:"JWT_SECRET" envDefault:"your-secret-key"`
@@ -54,14 +58,11 @@ func main() {
 	}
 	defer db.Close()
 
-	// TODO: Use authz package
-	// Initialize JWT service
-	jwtConfig := &internal.JWTConfig{
+	jwtConfig := &service.JWTConfig{
 		Key:      cfg.JWTSecret,
 		Duration: cfg.JWTDuration,
 		Issuer:   cfg.JWTIssuer,
 	}
-	jwtService := internal.NewJWTService(jwtConfig)
 
 	// Initialize Redis cache
 	redisConfig := cache.CacheConfig{
@@ -83,45 +84,62 @@ func main() {
 
 	// Initialize layers
 	userRepo := repository.NewUserRepository(db.Queries)
-	userService := service.NewUserService(userRepo, *jwtService, db.Queries)
+	userService := service.NewUserService(userRepo, db.Queries, jwtConfig, cfg.CoreServiceURL, redisCache)
 	userHandler := handler.NewUserHandler(userService)
-	healthHandler := handler.NewHealthHandler(db.Pool, redisCache)
+	healthHandler := handler.NewHealthHandler(db, redisCache)
+	internalHandler := handler.NewInternalHandler(userService)
 
 	router := gin.Default()
 	router.SetTrustedProxies(nil)
 
 	// Health check endpoints
 	router.GET("/healthz", healthHandler.HealthCheck)
-	router.GET("/ready", healthHandler.ReadinessCheck)
-	router.GET("/live", healthHandler.LivenessCheck)
+	router.GET("/readyz", healthHandler.ReadinessCheck)
 
 	// Authentication endpoints
 	v1 := router.Group("/api/v1")
-	v1.POST("/login/phone", userHandler.LoginByPhone)
-	v1.POST("/register/phone", userHandler.RegisterByPhone)
-	v1.POST("/login/email", userHandler.LoginWithEmail)
-	v1.POST("/register/email", userHandler.RegisterWithEmail)
+	{
+		v1.POST("/login/phone", userHandler.LoginByPhone)
+		v1.POST("/register/phone", userHandler.RegisterByPhone)
+		v1.POST("/login/email", userHandler.LoginWithEmail)
+		v1.POST("/register/email", userHandler.RegisterWithEmail)
+	}
 
-	// Simple token generation endpoint for testing
-	v1.POST("/token", func(c *gin.Context) {
-		var req struct {
-			UserID string `json:"user_id" binding:"required"`
+	internalHandler.RegisterInternalRoutes(router)
+
+	// Create HTTP server
+	server := &http.Server{
+		Addr:    ":" + cfg.HTTPPort,
+		Handler: router,
+	}
+
+	// Start server in goroutine
+	go func() {
+		logger.Info("Auth service starting", "port", cfg.HTTPPort)
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("Failed to start server", "error", err.Error())
+			log.Fatalf("Failed to start server: %v", err)
 		}
+	}()
 
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
-			return
-		}
+	// Wait for interrupt signal for graceful shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
-		token, err := jwtService.GenerateToken(req.UserID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
-			return
-		}
+	sig := <-quit
+	logger.Info("Shutdown signal received", "signal", sig.String())
 
-		c.JSON(http.StatusOK, gin.H{"token": token})
-	})
+	// Graceful shutdown with timeout
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-	log.Printf("Auth service starting on port %s", cfg.HTTPPort)
-	log.Fatal(router.Run(":" + cfg.HTTPPort))
+	logger.Info("Shutting down server...")
+
+	// Shutdown HTTP server
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		logger.Error("Server forced to shutdown", "error", err.Error())
+		log.Fatalf("Server forced to shutdown: %v", err)
+	}
+
+	logger.Info("Auth service stopped gracefully")
 }

@@ -1,10 +1,12 @@
 package handler
 
 import (
-	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+
+	"github.com/teammachinist/tutuplapak/services/auth/internal/logger"
 	"github.com/teammachinist/tutuplapak/services/auth/internal/model"
 	"github.com/teammachinist/tutuplapak/services/auth/internal/service"
 )
@@ -18,120 +20,114 @@ func NewUserHandler(userService *service.UserService) *UserHandler {
 }
 
 func (h *UserHandler) LoginByPhone(c *gin.Context) {
+	ctx := logger.WithRequestID(c.Request.Context())
+	logger.InfoCtx(ctx, "Login attempt", "method", "phone")
+
 	var req model.PhoneAuthRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.WarnCtx(ctx, "Invalid request body", "error", err.Error())
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
-	loginResponse, err := h.userService.LoginByPhone(c.Request.Context(), req.Phone, req.Password)
+	loginResponse, err := h.userService.LoginByPhone(ctx, req.Phone, req.Password)
 	if err != nil {
-		switch err.Error() {
-		case "phone not found":
-			c.JSON(http.StatusNotFound, gin.H{"error": "Phone not found"})
-		case "invalid credentials":
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
-		case "phone must start with international calling code prefix '+'":
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Phone must start with international calling code prefix '+'"})
-		case "invalid phone number format":
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid phone number format"})
-		case "password must be at least 8 characters long":
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Password must be at least 8 characters long"})
-		case "password must be at most 32 characters long":
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Password must be at most 32 characters long"})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
-		}
+		logger.WarnCtx(ctx, "Login failed", "method", "phone", "error", err.Error())
+		h.handleAuthError(c, err)
 		return
 	}
 
+	logger.InfoCtx(ctx, "Login successful", "method", "phone")
 	c.JSON(http.StatusOK, loginResponse)
 }
 
 func (h *UserHandler) RegisterByPhone(c *gin.Context) {
-	fmt.Println("Handler: RegisterByPhone")
+	ctx := logger.WithRequestID(c.Request.Context())
+	logger.InfoCtx(ctx, "Registration attempt", "method", "phone")
+
 	var req model.PhoneAuthRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.WarnCtx(ctx, "Invalid request body", "error", err.Error())
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
-	resp, err := h.userService.RegisterByPhone(c.Request.Context(), req.Phone, req.Password)
+	resp, err := h.userService.RegisterByPhone(ctx, req.Phone, req.Password)
 	if err != nil {
-		switch err.Error() {
-		case "phone number already exists":
-			c.JSON(http.StatusConflict, gin.H{"error": "Phone number already exists"})
-		case "phone must start with international calling code prefix '+'":
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Phone must start with international calling code prefix '+'"})
-		case "invalid phone number format":
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid phone number format"})
-		case "password must be at least 8 characters long":
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Password must be at least 8 characters long"})
-		case "password must be at most 32 characters long":
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Password must be at most 32 characters long"})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
-		}
+		logger.WarnCtx(ctx, "Registration failed", "method", "phone", "error", err.Error())
+		h.handleAuthError(c, err)
 		return
 	}
 
+	logger.InfoCtx(ctx, "Registration successful", "method", "phone")
 	c.JSON(http.StatusCreated, resp)
 }
 
 func (h *UserHandler) LoginWithEmail(c *gin.Context) {
-	fmt.Println("Handler: LoginWithEmail")
+	ctx := logger.WithRequestID(c.Request.Context())
+	logger.InfoCtx(ctx, "Login attempt", "method", "email")
+
 	var req model.EmailAuthRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.WarnCtx(ctx, "Invalid request body", "error", err.Error())
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
-	loginResponse, err := h.userService.LoginWithEmail(c.Request.Context(), req.Email, req.Password)
+	loginResponse, err := h.userService.LoginWithEmail(ctx, req.Email, req.Password)
 	if err != nil {
-		switch err.Error() {
-		case "email not found":
-			c.JSON(http.StatusNotFound, gin.H{"error": "Email not found"})
-		case "invalid credentials":
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
-		case "invalid email address format":
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid email address format"})
-		case "password must be at least 8 characters long":
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Password must be at least 8 characters long"})
-		case "password must be at most 32 characters long":
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Password must be at most 32 characters long"})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
-		}
+		logger.WarnCtx(ctx, "Login failed", "method", "email", "error", err.Error())
+		h.handleAuthError(c, err)
 		return
 	}
 
+	logger.InfoCtx(ctx, "Login successful", "method", "email")
 	c.JSON(http.StatusOK, loginResponse)
 }
 
 func (h *UserHandler) RegisterWithEmail(c *gin.Context) {
-	fmt.Println("Handler: RegisterWithEmail")
+	ctx := logger.WithRequestID(c.Request.Context())
+	logger.InfoCtx(ctx, "Registration attempt", "method", "email")
+
 	var req model.EmailAuthRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.WarnCtx(ctx, "Invalid request body", "error", err.Error())
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
-	resp, err := h.userService.RegisterWithEmail(c.Request.Context(), req.Email, req.Password)
+	resp, err := h.userService.RegisterWithEmail(ctx, req.Email, req.Password)
 	if err != nil {
-		switch err.Error() {
-		case "email address already exists":
-			c.JSON(http.StatusConflict, gin.H{"error": "Email address already exists"})
-		case "invalid email address format":
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid email address format"})
-		case "password must be at least 8 characters long":
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Password must be at least 8 characters long"})
-		case "password must be at most 32 characters long":
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Password must be at most 32 characters long"})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
-		}
+		logger.WarnCtx(ctx, "Registration failed", "method", "email", "error", err.Error())
+		h.handleAuthError(c, err)
 		return
 	}
 
+	logger.InfoCtx(ctx, "Registration successful", "method", "email")
 	c.JSON(http.StatusCreated, resp)
+}
+
+// Helper to reduce duplication and centralize error handling
+func (h *UserHandler) handleAuthError(c *gin.Context, err error) {
+	errorMsg := err.Error()
+
+	switch errorMsg {
+	case "email not found", "phone not found":
+		c.JSON(http.StatusNotFound, gin.H{"error": errorMsg})
+	case "invalid credentials":
+		c.JSON(http.StatusUnauthorized, gin.H{"error": errorMsg})
+	case "email address already exists", "phone number already exists":
+		c.JSON(http.StatusConflict, gin.H{"error": errorMsg})
+	default:
+		// Check for validation errors (format/length issues)
+		if strings.Contains(errorMsg, "format") ||
+			strings.Contains(errorMsg, "characters") ||
+			strings.Contains(errorMsg, "required") ||
+			strings.Contains(errorMsg, "must start") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": errorMsg})
+		} else {
+			// Unknown error - could be system issue
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		}
+	}
 }

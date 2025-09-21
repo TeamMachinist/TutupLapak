@@ -15,9 +15,12 @@ type Querier interface {
 	CheckPhoneExists(ctx context.Context, phone string) (bool, error)
 	CreateUserByEmail(ctx context.Context, arg CreateUserByEmailParams) (CreateUserByEmailRow, error)
 	CreateUserByPhone(ctx context.Context, arg CreateUserByPhoneParams) (CreateUserByPhoneRow, error)
+	DeleteUserAuth(ctx context.Context, id uuid.UUID) error
 	GetUserAuthByEmail(ctx context.Context, email string) (GetUserAuthByEmailRow, error)
 	GetUserAuthByID(ctx context.Context, id uuid.UUID) (GetUserAuthByIDRow, error)
 	GetUserAuthByPhone(ctx context.Context, phone string) (GetUserAuthByPhoneRow, error)
+	UpdateUserAuthEmail(ctx context.Context, arg UpdateUserAuthEmailParams) (UsersAuth, error)
+	UpdateUserAuthPhone(ctx context.Context, arg UpdateUserAuthPhoneParams) (UsersAuth, error)
 }
 
 var _ Querier = (*Queries)(nil)

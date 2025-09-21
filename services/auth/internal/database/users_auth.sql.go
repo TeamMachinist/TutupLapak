@@ -108,6 +108,15 @@ func (q *Queries) CreateUserByPhone(ctx context.Context, arg CreateUserByPhonePa
 	return i, err
 }
 
+const deleteUserAuth = `-- name: DeleteUserAuth :exec
+DELETE FROM users_auth WHERE id = $1
+`
+
+func (q *Queries) DeleteUserAuth(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteUserAuth, id)
+	return err
+}
+
 const getUserAuthByEmail = `-- name: GetUserAuthByEmail :one
 SELECT
     id,
@@ -200,6 +209,52 @@ func (q *Queries) GetUserAuthByPhone(ctx context.Context, phone string) (GetUser
 		&i.Phone,
 		&i.PasswordHash,
 		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const updateUserAuthEmail = `-- name: UpdateUserAuthEmail :one
+UPDATE users_auth SET email = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING id, email, phone, password_hash, created_at, updated_at
+`
+
+type UpdateUserAuthEmailParams struct {
+	ID    uuid.UUID `json:"id"`
+	Email string    `json:"email"`
+}
+
+func (q *Queries) UpdateUserAuthEmail(ctx context.Context, arg UpdateUserAuthEmailParams) (UsersAuth, error) {
+	row := q.db.QueryRow(ctx, updateUserAuthEmail, arg.ID, arg.Email)
+	var i UsersAuth
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Phone,
+		&i.PasswordHash,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateUserAuthPhone = `-- name: UpdateUserAuthPhone :one
+UPDATE users_auth SET phone = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING id, email, phone, password_hash, created_at, updated_at
+`
+
+type UpdateUserAuthPhoneParams struct {
+	ID    uuid.UUID `json:"id"`
+	Phone string    `json:"phone"`
+}
+
+func (q *Queries) UpdateUserAuthPhone(ctx context.Context, arg UpdateUserAuthPhoneParams) (UsersAuth, error) {
+	row := q.db.QueryRow(ctx, updateUserAuthPhone, arg.ID, arg.Phone)
+	var i UsersAuth
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Phone,
+		&i.PasswordHash,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
