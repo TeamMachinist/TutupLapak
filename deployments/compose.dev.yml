@@ -20,6 +20,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_DURATION: ${JWT_DURATION}
       JWT_ISSUER: ${JWT_ISSUER}
+      CORE_SERVICE_URL: ${CORE_SERVICE_URL}
     depends_on:
       main-db:
         condition: service_healthy
@@ -56,13 +57,12 @@ services:
       REDIS_DB: ${REDIS_DB}
       AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
       FILES_SERVICE_URL: ${FILES_SERVICE_URL}
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_DURATION: ${JWT_DURATION}
-      JWT_ISSUER: ${JWT_ISSUER}
     depends_on:
       main-db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      auth-service:
         condition: service_healthy
     restart: unless-stopped
     networks:
@@ -95,15 +95,15 @@ services:
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
       MINIO_BUCKET: ${MINIO_BUCKET}
       MINIO_USE_SSL: ${MINIO_USE_SSL}
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_DURATION: ${JWT_DURATION}
-      JWT_ISSUER: ${JWT_ISSUER}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
     depends_on:
       main-db:
         condition: service_healthy
       minio:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      auth-service:
         condition: service_healthy
     restart: unless-stopped
     networks:
@@ -146,8 +146,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - main_data:/var/lib/postgresql/data
-      - ../migrations:/docker-entrypoint-initdb.d/:ro
-      - ../seeds:/seeds:ro
     ports:
       - "${POSTGRES_PORT}:5432"
     restart: unless-stopped

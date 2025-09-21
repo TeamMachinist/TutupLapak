@@ -40,7 +40,7 @@ echo
 # POST create first product
 echo ">>> Test 2: Create first product"
 echo "Endpoint: POST $MAIN_BASE_URL/product"
-PRODUCT1_DATA="{\"name\":\"Laptop $SHORT_TS\",\"category\":\"electronic\",\"qty\":3,\"price\":15000000,\"sku\":\"ELECT$SHORT_TS\",\"fileId\":\"0199604f-78e9-759b-9d3e-7bab2a68c469\"}"
+PRODUCT1_DATA="{\"name\":\"Laptop $SHORT_TS\",\"category\":\"Electronic\",\"qty\":3,\"price\":15000000,\"sku\":\"ELECT$SHORT_TS\",\"fileId\":\"0199604f-78e9-759b-9d3e-7bab2a68c469\"}"
 echo "Body: $PRODUCT1_DATA"
 echo -n "Response: "
 PRODUCT1_RESPONSE=$(curl -X POST "$MAIN_BASE_URL/product" \
@@ -59,7 +59,7 @@ echo
 # POST create second product
 echo ">>> Test 3: Create second product"
 echo "Endpoint: POST $MAIN_BASE_URL/product"
-PRODUCT2_DATA="{\"name\":\"Kaos $SHORT_TS\",\"category\":\"clothing\",\"qty\":3,\"price\":80000000,\"sku\":\"CLOTH$SHORT_TS\",\"fileId\":\"0199604f-78e9-759b-9d3e-7bab2a68c469\"}"
+PRODUCT2_DATA="{\"name\":\"Kaos $SHORT_TS\",\"category\":\"Clothes\",\"qty\":3,\"price\":80000000,\"sku\":\"CLOTH$SHORT_TS\",\"fileId\":\"01996a58-f079-7396-85b6-c21666cd9744\"}"
 echo "Body: $PRODUCT2_DATA"
 echo -n "Response: "
 PRODUCT2_RESPONSE=$(curl -X POST "$MAIN_BASE_URL/product" \

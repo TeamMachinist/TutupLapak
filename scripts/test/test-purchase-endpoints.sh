@@ -16,7 +16,7 @@ echo
 # POST create purchase with single item
 echo ">>> Test 1: Create purchase with single item"
 echo "Endpoint: POST $MAIN_BASE_URL/purchase"
-PURCHASE1_DATA="{\"purchasedItems\":[{\"productId\":\"01996461-90c0-7045-80e6-4639491d766a\",\"qty\":2}],\"senderName\":\"John Doe Test\",\"senderContactType\":\"email\",\"senderContactDetail\":\"john.test@example.com\"}"
+PURCHASE1_DATA="{\"purchasedItems\":[{\"productId\":\"00000000-0000-0000-0000-100000000000\",\"qty\":2}],\"senderName\":\"John Doe Test\",\"senderContactType\":\"email\",\"senderContactDetail\":\"john.test@example.com\"}"
 echo "Body: $PURCHASE1_DATA"
 echo -n "Response: "
 PURCHASE1_RESPONSE=$(curl -X POST "$MAIN_BASE_URL/purchase" \
@@ -34,7 +34,7 @@ echo
 # POST create purchase with multiple items
 echo ">>> Test 2: Create purchase with multiple items"
 echo "Endpoint: POST $MAIN_BASE_URL/purchase"
-PURCHASE2_DATA="{\"purchasedItems\":[{\"productId\":\"01996461-90c0-7045-80e6-4639491d766a\",\"qty\":2},{\"productId\":\"01996461-90e7-772e-8d00-6a6ed0acc24c\",\"qty\":2}],\"senderName\":\"Jane Smith\",\"senderContactType\":\"phone\",\"senderContactDetail\":\"+628123456789\"}"
+PURCHASE2_DATA="{\"purchasedItems\":[{\"productId\":\"00000000-0000-0000-0000-200000000000\",\"qty\":2},{\"productId\":\"00000000-0000-0000-0000-300000000000\",\"qty\":2}],\"senderName\":\"Jane Smith\",\"senderContactType\":\"phone\",\"senderContactDetail\":\"+628123456789\"}"
 echo "Body: $PURCHASE2_DATA"
 echo -n "Response: "
 PURCHASE2_RESPONSE=$(curl -X POST "$MAIN_BASE_URL/purchase" \
@@ -53,7 +53,7 @@ echo
 if [ -n "$PURCHASE1_ID" ]; then
     echo ">>> Test 3: Confirm purchase payment"
     echo "Endpoint: POST $MAIN_BASE_URL/purchase/$PURCHASE1_ID"
-    PAYMENT_DATA="{\"fileIds\":[\"0199604f-78e9-759b-9d3e-7bab2a68c469\"]}"
+    PAYMENT_DATA="{\"fileIds\":[\"01996a58-f079-7396-85b6-c21666cd9744\"]}"
     echo "Body: $PAYMENT_DATA"
     echo -n "Response: "
     curl -X POST "$MAIN_BASE_URL/purchase/$PURCHASE1_ID" \
@@ -69,7 +69,7 @@ fi
 if [ -n "$PURCHASE2_ID" ]; then
     echo ">>> Test 4: Confirm purchase with multiple payment proofs"
     echo "Endpoint: POST $MAIN_BASE_URL/purchase/$PURCHASE2_ID"
-    PAYMENT_MULTI_DATA="{\"fileIds\":[\"0199604f-78e9-759b-9d3e-7bab2a68c468\",\"0199604f-78e9-759b-9d3e-7bab2a68c469\"]}"
+    PAYMENT_MULTI_DATA="{\"fileIds\":[\"01996a58-f0bf-73e3-bb6d-ec600b6b8e63\",\"01996a58-f079-7396-85b6-c21666cd9744\"]}"
     echo "Body: $PAYMENT_MULTI_DATA"
     echo -n "Response: "
     curl -X POST "$MAIN_BASE_URL/purchase/$PURCHASE2_ID" \
