@@ -1,0 +1,3 @@
+-- Files service seed data
+INSERT INTO files (id, user_id, file_uri, file_thumbnail_uri) VALUES ('00000000-0000-0000-0000-000000000100', '00000000-0000-0000-0000-000000000012', 'uploads/sample-product-1.jpg', 'uploads/sample-product-1-thumb.jpg') ON CONFLICT (id) DO NOTHING;
+INSERT INTO files (id, user_id, file_uri, file_thumbnail_uri) VALUES ('00000000-0000-0000-0000-000000000200', '00000000-0000-0000-0000-000000000013', 'uploads/sample-product-2.jpg', 'uploads/sample-product-2-thumb.jpg') ON CONFLICT (id) DO NOTHING;

@@ -7,21 +7,27 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/teammachinist/tutuplapak/internal"
-	"github.com/teammachinist/tutuplapak/internal/cache"
-	"github.com/teammachinist/tutuplapak/internal/logger"
-	"github.com/teammachinist/tutuplapak/services/core/clients"
-	"github.com/teammachinist/tutuplapak/services/core/config"
-	"github.com/teammachinist/tutuplapak/services/core/handlers"
-	"github.com/teammachinist/tutuplapak/services/core/repositories"
-	"github.com/teammachinist/tutuplapak/services/core/services"
+	"github.com/teammachinist/tutuplapak/services/auth/pkg/authz"
+	"github.com/teammachinist/tutuplapak/services/core/internal/cache"
+	"github.com/teammachinist/tutuplapak/services/core/internal/clients"
+	"github.com/teammachinist/tutuplapak/services/core/internal/config"
+	"github.com/teammachinist/tutuplapak/services/core/internal/database"
+	"github.com/teammachinist/tutuplapak/services/core/internal/handler"
+	"github.com/teammachinist/tutuplapak/services/core/internal/logger"
+	"github.com/teammachinist/tutuplapak/services/core/internal/repository"
+	"github.com/teammachinist/tutuplapak/services/core/internal/service"
 
 	"github.com/gofiber/fiber/v2"
 	fiberlog "github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/fiber/v2/middleware/requestid"
 )
 
 func main() {
 	ctx := context.Background()
+
+	// Initialize logger
+	logger.Init()
+	logger.Info("Starting Core service")
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -30,7 +36,7 @@ func main() {
 
 	logger.Init()
 
-	database, err := internal.NewDatabase(ctx, cfg.Database.DatabaseURL)
+	database, err := database.NewDatabase(ctx, cfg.Database.DatabaseURL)
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
@@ -47,62 +53,73 @@ func main() {
 	app := fiber.New(fiber.Config{
 		Prefork: enablePrefork,
 		AppName: "Core Service v1.0",
+		Network: "tcp",
 	})
 
 	app.Use(fiberlog.New())
+	app.Use(requestid.New())
 
-	app.Get("/healthz", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"status":  "healthy",
-			"service": "core",
-		})
-	})
+	// app.Get("/healthz", func(c *fiber.Ctx) error {
+	// 	return c.JSON(fiber.Map{
+	// 		"status":  "healthy",
+	// 		"service": "core",
+	// 	})
+	// })
 
-	jwtConfig := &internal.JWTConfig{
-		Key:      cfg.JWT.Secret,
-		Duration: cfg.JWT.Duration,
-		Issuer:   cfg.JWT.Issuer,
-	}
-	jwtService := internal.NewJWTService(jwtConfig)
+	// Initiate auth middleware and client
+	authClient := authz.NewAuthClient(cfg.App.AuthServiceURL)
+	authMiddleware := authz.NewAuthMiddleware(cfg.App.AuthServiceURL)
 
 	fileClient := clients.NewFileClient(cfg.App.FileUrl)
 
-	productRepo := repositories.NewProductRepository(database.Queries)
-	purchaseRepo := repositories.NewPurchaseRepository(database.Pool, database.Queries)
-	userRepo := repositories.NewUserRepository(database.Queries)
+	productRepo := repository.NewProductRepository(database.Queries)
+	purchaseRepo := repository.NewPurchaseRepository(database.Pool, database.Queries)
+	userRepo := repository.NewUserRepository(database.Queries)
 
-	productService := services.NewProductService(productRepo, fileClient, redisClient)
-	purchaseService := services.NewPurchaseService(purchaseRepo, productRepo, fileClient)
-	userService := services.NewUserService(userRepo, fileClient, redisClient)
+	productService := service.NewProductService(productRepo, fileClient, redisClient)
+	purchaseService := service.NewPurchaseService(purchaseRepo, productRepo, fileClient)
+	userService := service.NewUserService(userRepo, fileClient, redisClient, authClient)
 
-	productHandler := handlers.NewProductHandler(productService)
-	purchaseHandler := handlers.NewPurchaseHandler(purchaseService)
-	userHandler := handlers.NewUserHandler(userService)
+	productHandler := handler.NewProductHandler(productService)
+	purchaseHandler := handler.NewPurchaseHandler(purchaseService)
+	userHandler := handler.NewUserHandler(userService)
+
+	healthHandler := handler.NewHealthHandler(database, redisClient)
+	internalHandler := handler.NewInternalHandler(userService)
+
+	app.Get("/healthz", healthHandler.HealthCheck)
+	app.Get("/readyz", healthHandler.ReadinessCheck)
 
 	api := app.Group("/api/v1")
 
-	products := api.Group("/products")
+	products := api.Group("/product")
 	{
 		products.Get("", productHandler.GetAllProducts)
-		products.Post("", jwtService.FiberMiddleware(), productHandler.CreateProduct)
-		products.Put("/:productId", jwtService.FiberMiddleware(), productHandler.UpdateProduct)
-		products.Delete("/:productId", jwtService.FiberMiddleware(), productHandler.DeleteProduct)
+		products.Post("", authMiddleware.FiberMiddleware(), productHandler.CreateProduct)
+		products.Put("/:productId", authMiddleware.FiberMiddleware(), productHandler.UpdateProduct)
+		products.Delete("/:productId", authMiddleware.FiberMiddleware(), productHandler.DeleteProduct)
 
 	}
 
 	// User management endpoints (auth-protected)
 	user := api.Group("/user")
 	{
-		user.Post("/link/phone", jwtService.FiberMiddleware(), userHandler.LinkPhone)
-		user.Post("/link/email", jwtService.FiberMiddleware(), userHandler.LinkEmail)
-		user.Get("", jwtService.FiberMiddleware(), userHandler.GetUserWithFileId)
-		user.Put("", jwtService.FiberMiddleware(), userHandler.UpdateUser)
+		user.Post("/link/phone", authMiddleware.FiberMiddleware(), userHandler.LinkPhone)
+		user.Post("/link/email", authMiddleware.FiberMiddleware(), userHandler.LinkEmail)
+		user.Get("", authMiddleware.FiberMiddleware(), userHandler.GetUserWithFileId)
+		user.Put("", authMiddleware.FiberMiddleware(), userHandler.UpdateUser)
 	}
 
 	purchase := api.Group("/purchase")
 	{
 		purchase.Post("", purchaseHandler.CreatePurchase)
 		purchase.Post("/:purchaseId", purchaseHandler.UploadPaymentProof)
+	}
+
+	internal := app.Group("/internal")
+	{
+		internal.Get("/user/:userAuthID", internalHandler.GetUserFromAuth)
+		internal.Post("/user", internalHandler.CreateUserFromAuth)
 	}
 
 	c := make(chan os.Signal, 1)

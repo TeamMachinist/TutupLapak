@@ -8,9 +8,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/teammachinist/tutuplapak/internal"
-	"github.com/teammachinist/tutuplapak/internal/cache"
-	"github.com/teammachinist/tutuplapak/internal/logger"
+	"github.com/teammachinist/tutuplapak/services/auth/pkg/authz"
+	"github.com/teammachinist/tutuplapak/services/files/internal/cache"
+	"github.com/teammachinist/tutuplapak/services/files/internal/database"
+	"github.com/teammachinist/tutuplapak/services/files/internal/handler"
+	"github.com/teammachinist/tutuplapak/services/files/internal/logger"
+	"github.com/teammachinist/tutuplapak/services/files/internal/service"
+	"github.com/teammachinist/tutuplapak/services/files/internal/storage"
 
 	"github.com/caarlos0/env"
 	"github.com/go-chi/chi/v5"
@@ -19,8 +23,9 @@ import (
 )
 
 type Config struct {
-	HTTPPort    string `env:"PORT" envDefault:"8003"`
-	DatabaseURL string `env:"DATABASE_URL" envDefault:""`
+	HTTPPort       string `env:"PORT" envDefault:"8003"`
+	DatabaseURL    string `env:"DATABASE_URL" envDefault:""`
+	AuthServiceURL string `env:"AUTH_SERVICE_URL" envDefault:""`
 
 	// JWT Configuration
 	JWTSecret   string        `env:"JWT_SECRET" envDefault:"tutupsecret"`
@@ -42,15 +47,17 @@ type Config struct {
 }
 
 type Dependencies struct {
-	DB         *internal.DB
-	RedisCache *cache.RedisCache
-	JWTService *internal.JWTService
-	MinIO      *MinIOStorage
+	DB             *database.DB
+	RedisCache     *cache.RedisCache
+	AuthClient     *authz.AuthClient
+	AuthMiddleware *authz.AuthMiddleware
+	MinIO          *storage.MinIOStorage
 }
 
 type Services struct {
-	FileService FileService
-	FileHandler *FileHandler
+	FileService   service.FileService
+	FileHandler   *handler.FileHandler
+	HealthHandler *handler.HealthHandler
 }
 
 func main() {
@@ -102,7 +109,7 @@ func setupDependencies(cfg Config) Dependencies {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	db, err := internal.NewDatabase(ctx, cfg.DatabaseURL)
+	db, err := database.NewDatabase(ctx, cfg.DatabaseURL)
 	if err != nil {
 		logger.Error("Database connection failed", "error", err, "url", cfg.DatabaseURL)
 		os.Exit(1)
@@ -122,17 +129,12 @@ func setupDependencies(cfg Config) Dependencies {
 		logger.Warn("Redis connection failed - running without cache", "error", err)
 	}
 
-	// Initialize JWT service
-	jwtConfig := &internal.JWTConfig{
-		Key:      cfg.JWTSecret,
-		Duration: cfg.JWTDuration,
-		Issuer:   cfg.JWTIssuer,
-	}
-	jwtService := internal.NewJWTService(jwtConfig)
-	logger.Info("JWT service initialized", "issuer", cfg.JWTIssuer, "duration", cfg.JWTDuration)
+	// Initialize authz middleware and client
+	authClient := authz.NewAuthClient(cfg.AuthServiceURL)
+	authMiddleware := authz.NewAuthMiddleware(cfg.AuthServiceURL)
 
 	// Initialize MinIO storage
-	minioConfig := &MinIOConfig{
+	minioConfig := &storage.MinIOConfig{
 		Endpoint:       cfg.MinIOEndpoint,
 		BucketName:     cfg.MinIOBucket,
 		PublicEndpoint: cfg.MinIOPublicEndpoint,
@@ -141,7 +143,7 @@ func setupDependencies(cfg Config) Dependencies {
 		SecretKey:      cfg.MinIOSecretKey,
 	}
 
-	minioStorage, err := NewMinIOStorage(minioConfig)
+	minioStorage, err := storage.NewMinIOStorage(minioConfig)
 	if err != nil {
 		logger.Error("Failed to initialize MinIO storage", "error", err, "endpoint", cfg.MinIOEndpoint)
 		os.Exit(1)
@@ -149,20 +151,23 @@ func setupDependencies(cfg Config) Dependencies {
 	logger.Info("MinIO storage initialized", "endpoint", cfg.MinIOEndpoint, "bucket", cfg.MinIOBucket)
 
 	return Dependencies{
-		DB:         db,
-		RedisCache: redisCache,
-		JWTService: jwtService,
-		MinIO:      minioStorage,
+		DB:             db,
+		RedisCache:     redisCache,
+		AuthClient:     authClient,
+		AuthMiddleware: authMiddleware,
+		MinIO:          minioStorage,
 	}
 }
 
 func setupServices(deps Dependencies) Services {
-	fileService := NewFileService(deps.DB.Queries, deps.RedisCache)
-	fileHandler := NewFileHandler(deps.MinIO, fileService)
+	fileService := service.NewFileService(deps.DB.Queries, deps.RedisCache)
+	fileHandler := handler.NewFileHandler(deps.MinIO, fileService)
+	healthHandler := handler.NewHealthHandler(deps.DB, deps.RedisCache)
 
 	return Services{
-		FileService: fileService,
-		FileHandler: fileHandler,
+		FileService:   fileService,
+		FileHandler:   fileHandler,
+		HealthHandler: healthHandler,
 	}
 }
 
@@ -175,20 +180,22 @@ func setupRoutes(services Services, deps Dependencies) *chi.Mux {
 	r.Use(middleware.Timeout(30 * time.Second))
 	r.Use(requestLoggerMiddleware)
 
-	// Static files
+	// Static files -> What does it serve?
 	fs := http.FileServer(http.Dir("static"))
 	r.Handle("/static/*", http.StripPrefix("/static/", fs))
 
 	// Health check (no auth required)
-	r.Get("/healthz", healthHandler(deps.DB, deps.RedisCache))
+	r.Get("/healthz", services.HealthHandler.HealthCheck)
+	r.Get("/readyz", services.HealthHandler.ReadinessCheck)
 
-	// Pragmatically no auth for now, to ease fetch by core service (purchase)
+	// Pragmatically no auth for now, easier fetch for user and core services
+	// Can be changed to use `internal` prefix later, follow auth service design
 	r.Get("/api/v1/file/{fileId}", services.FileHandler.GetFile)
 	r.Get("/api/v1/file", services.FileHandler.GetFiles)
 
 	// API routes with authentication
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Use(deps.JWTService.ChiMiddleware)
+		r.Use(deps.AuthMiddleware.ChiMiddleware)
 		r.Post("/file", services.FileHandler.UploadFile)
 		// r.Get("/file/{fileId}", services.FileHandler.GetFile)
 		r.Delete("/file/{fileId}", services.FileHandler.DeleteFile)
@@ -294,7 +301,7 @@ func requestLoggerMiddleware(next http.Handler) http.Handler {
 }
 
 // Health handler
-func healthHandler(db *internal.DB, redisCache *cache.RedisCache) http.HandlerFunc {
+func healthHandler(db *database.DB, redisCache *cache.RedisCache) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := context.Background()
 		requestCtx := r.Context()

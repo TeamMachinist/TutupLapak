@@ -1,0 +1,5 @@
+-- Auth service seed data (password is "password123")
+INSERT INTO users_auth (id, email, phone, password_hash) VALUES ('00000000-0000-0000-0000-000000000004', 'tutuplapak@projectsprint.com', '', '$2a$10$Jy7S4Ea8VgcbeVLrhNaQz.TdHKUEyMFzTkAercFa3TPqee/bKV67.') ON CONFLICT (id) DO NOTHING;
+INSERT INTO users_auth (id, email, phone, password_hash) VALUES ('00000000-0000-0000-0000-000000000001', '', '+628562856285', '$2a$10$Jy7S4Ea8VgcbeVLrhNaQz.TdHKUEyMFzTkAercFa3TPqee/bKV67.') ON CONFLICT (id) DO NOTHING;
+INSERT INTO users_auth (id, email, phone, password_hash) VALUES ('00000000-0000-0000-0000-000000000002', 'seller@example.com', '+628123456789', '$2a$10$Jy7S4Ea8VgcbeVLrhNaQz.TdHKUEyMFzTkAercFa3TPqee/bKV67.') ON CONFLICT (id) DO NOTHING;
+INSERT INTO users_auth (id, email, phone, password_hash) VALUES ('00000000-0000-0000-0000-000000000003', 'buyer@example.com', '+628987654321', '$2a$10$Jy7S4Ea8VgcbeVLrhNaQz.TdHKUEyMFzTkAercFa3TPqee/bKV67.') ON CONFLICT (id) DO NOTHING;
