@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/teammachinist/tutuplapak/services/auth/internal/logger"
 )
 
 //go:embed migrations/001_create_users_auth_table.sql
@@ -95,6 +96,7 @@ func (db *DB) initializeDatabase(ctx context.Context) error {
 	}
 
 	if migrationNeeded {
+		logger.InfoCtx(ctx, "Executing auth core database migration")
 		if err := db.runMigrations(ctx); err != nil {
 			return fmt.Errorf("migration failed: %w", err)
 		}
@@ -108,6 +110,7 @@ func (db *DB) initializeDatabase(ctx context.Context) error {
 		}
 
 		if seedingNeeded {
+			logger.InfoCtx(ctx, "Executing auth core dummy data seeding")
 			if err := db.seedData(ctx); err != nil {
 				return fmt.Errorf("seeding failed: %w", err)
 			}

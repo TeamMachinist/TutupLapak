@@ -53,7 +53,7 @@ echo
 if [ -n "$PURCHASE1_ID" ]; then
     echo ">>> Test 3: Confirm purchase payment"
     echo "Endpoint: POST $MAIN_BASE_URL/purchase/$PURCHASE1_ID"
-    PAYMENT_DATA="{\"fileIds\":[\"01996a58-f079-7396-85b6-c21666cd9744\"]}"
+    PAYMENT_DATA="{\"fileIds\":[\"00000000-0000-0000-0000-000000000100\"]}"
     echo "Body: $PAYMENT_DATA"
     echo -n "Response: "
     curl -X POST "$MAIN_BASE_URL/purchase/$PURCHASE1_ID" \
@@ -69,7 +69,7 @@ fi
 if [ -n "$PURCHASE2_ID" ]; then
     echo ">>> Test 4: Confirm purchase with multiple payment proofs"
     echo "Endpoint: POST $MAIN_BASE_URL/purchase/$PURCHASE2_ID"
-    PAYMENT_MULTI_DATA="{\"fileIds\":[\"01996a58-f0bf-73e3-bb6d-ec600b6b8e63\",\"01996a58-f079-7396-85b6-c21666cd9744\"]}"
+    PAYMENT_MULTI_DATA="{\"fileIds\":[\"00000000-0000-0000-0000-000000000100\",\"00000000-0000-0000-0000-000000000200\"]}"
     echo "Body: $PAYMENT_MULTI_DATA"
     echo -n "Response: "
     curl -X POST "$MAIN_BASE_URL/purchase/$PURCHASE2_ID" \

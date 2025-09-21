@@ -124,7 +124,7 @@ func (db *DB) isMigrationNeeded(ctx context.Context) (bool, error) {
         SELECT EXISTS (
             SELECT FROM information_schema.tables 
             WHERE table_schema = 'public' 
-            AND table_name = 'users_auth'
+            AND table_name = 'files'
         )
     `).Scan(&exists)
 
@@ -148,7 +148,7 @@ func (db *DB) isSeedingNeeded(ctx context.Context) (bool, error) {
 
 	// Check if any seed data exists
 	var count int
-	err = db.Pool.QueryRow(ctx, "SELECT COUNT(*) FROM users_auth").Scan(&count)
+	err = db.Pool.QueryRow(ctx, "SELECT COUNT(*) FROM files").Scan(&count)
 	if err != nil {
 		return false, fmt.Errorf("failed to check seed data: %w", err)
 	}
