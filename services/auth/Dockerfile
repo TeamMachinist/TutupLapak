@@ -6,12 +6,14 @@ RUN apk add --no-cache git
 
 WORKDIR /app
 
-# Copy go mod files first (better caching)
-COPY go.mod go.sum ./
-RUN go mod download
+# Copy auth service files (no external dependencies needed)
+COPY services/auth/ services/auth/
 
-# Copy source code
-COPY . .
+# Move to service directory (consistent with core/files pattern)
+WORKDIR /app/services/auth
+
+# Download dependencies
+RUN go mod download
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
@@ -26,10 +28,7 @@ RUN apk --no-cache add ca-certificates tzdata wget
 WORKDIR /app
 
 # Copy the binary from builder stage
-COPY --from=builder /app/main .
-
-# Copy migration files if they exist
-COPY --from=builder /app/migrations ./migrations
+COPY --from=builder /app/services/auth/main .
 
 # Create non-root user (more secure approach)
 RUN addgroup -g 1001 -S appgroup && \

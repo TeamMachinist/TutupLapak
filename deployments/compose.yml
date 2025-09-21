@@ -2,6 +2,7 @@ services:
   # API Gateway
   nginx:
     image: nginx:alpine
+    container_name: tutuplapak-nginx
     ports:
       - "80:80"
     volumes:
@@ -11,9 +12,12 @@ services:
       - core-service
       - files-service
     restart: unless-stopped
+    networks:
+      - tutuplapak-network
 
   # Auth Service
   auth-service:
+    container_name: tutuplapak-auth-service
     build:
       context: ..
       dockerfile: services/auth/Dockerfile
@@ -21,14 +25,34 @@ services:
       - "${AUTH_PORT}"
     environment:
       - ENV=production
+      - GIN_MODE=release
       - PORT=${AUTH_PORT}
       - DATABASE_URL=${DATABASE_URL}
+      - REDIS_ADDR=${REDIS_ADDR}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_DB=${REDIS_DB}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_DURATION=${JWT_DURATION}
+      - JWT_ISSUER=${JWT_ISSUER}
+      - CORE_SERVICE_URL=${CORE_SERVICE_URL}
     depends_on:
-      - main-db
+      main-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
+    networks:
+      - tutuplapak-network
+    healthcheck:
+      # test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:${AUTH_PORT}/healthz"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "-O", "/dev/null", "http://localhost:${AUTH_PORT}/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # Core Service
+  # Core Service  
   core-service:
+    container_name: tutuplapak-core-service
     build:
       context: ..
       dockerfile: services/core/Dockerfile
@@ -37,15 +61,33 @@ services:
     environment:
       - ENV=production
       - PORT=${CORE_PORT}
+      - API_TIMEOUT=${API_TIMEOUT}
       - DATABASE_URL=${DATABASE_URL}
+      - REDIS_ADDR=${REDIS_ADDR}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_DB=${REDIS_DB}
       - AUTH_SERVICE_URL=${AUTH_SERVICE_URL}
       - FILES_SERVICE_URL=${FILES_SERVICE_URL}
     depends_on:
-      - main-db
+      main-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
     restart: unless-stopped
+    networks:
+      - tutuplapak-network
+    healthcheck:
+      # test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:${CORE_PORT}/healthz"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "-O", "/dev/null", "http://localhost:${CORE_PORT}/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Files Service
   files-service:
+    container_name: tutuplapak-files-service
     build:
       context: ..
       dockerfile: services/files/Dockerfile
@@ -55,46 +97,85 @@ services:
       - ENV=production
       - PORT=${FILES_PORT}
       - DATABASE_URL=${DATABASE_URL}
+      - REDIS_ADDR=${REDIS_ADDR}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_DB=${REDIS_DB}
       - MINIO_ENDPOINT=${MINIO_ENDPOINT}
       - MINIO_PUBLIC_ENDPOINT=${MINIO_PUBLIC_ENDPOINT}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
       - MINIO_BUCKET=${MINIO_BUCKET}
       - MINIO_USE_SSL=${MINIO_USE_SSL}
-
+      - AUTH_SERVICE_URL=${AUTH_SERVICE_URL}
     depends_on:
-      - main-db
+      main-db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
     restart: unless-stopped
+    networks:
+      - tutuplapak-network
+    healthcheck:
+      # test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:${FILES_PORT}/healthz"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "-O", "/dev/null", "http://localhost:${FILES_PORT}/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: tutuplapak-redis
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - tutuplapak-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 5
+
+  # MinIO Storage
   minio:
     image: minio/minio:latest
     container_name: tutuplapak-minio
-    env_file: .env
-    ports:
-      - "${MINIO_PORT}:9000"
-      - "${MINIO_CONSOLE_PORT}:9001" # Remove console port for production
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
     volumes:
       - minio_data:/data
-    command: server /data --console-address ":9001"
-    # command: server /data # Remove --console-address flag for production
-    # networks:
-    #   - tutuplapak-network
+    command: server /data
+    restart: unless-stopped
+    networks:
+      - tutuplapak-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 30s
       timeout: 20s
       retries: 3
+
   # Main Database
   main-db:
     image: postgres:15-alpine
+    container_name: tutuplapak-postgres
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
-      - main_data:/var/lib/postgresql/data
-      - ../migrations:/docker-entrypoint-initdb.d/:ro
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT}:5432"
     restart: unless-stopped
+    networks:
+      - tutuplapak-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
@@ -102,9 +183,10 @@ services:
       retries: 5
 
 volumes:
-  main_data:
-    driver: local
+  postgres_data:
+  redis_data:
+  minio_data:
 
 networks:
-  default:
-    name: tutuplapak-network
+  tutuplapak-network:
+    driver: bridge
