@@ -2,7 +2,6 @@
 package handler
 
 import (
-	"context"
 	"net/http"
 	"regexp"
 	"strings"
@@ -24,6 +23,8 @@ func NewPurchaseHandler(purchaseService service.PurchaseServiceInterface) *Purch
 }
 
 func (h *PurchaseHandler) CreatePurchase(c *fiber.Ctx) error {
+	ctx := c.Context()
+
 	var req model.PurchaseRequest
 
 	if err := c.BodyParser(&req); err != nil {
@@ -70,7 +71,7 @@ func (h *PurchaseHandler) CreatePurchase(c *fiber.Ctx) error {
 		}
 	}
 
-	resp, err := h.purchaseService.CreatePurchase(context.Background(), req)
+	resp, err := h.purchaseService.CreatePurchase(ctx, req)
 	if err != nil {
 		switch {
 		case err.Error() == "product not found":
@@ -78,6 +79,7 @@ func (h *PurchaseHandler) CreatePurchase(c *fiber.Ctx) error {
 		case strings.HasPrefix(err.Error(), "insufficient stock for"):
 			return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "quantity exceeds available stock"})
 		default:
+			logger.WarnCtx(ctx, "Failed to create purchase", "error", err.Error())
 			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
 		}
 	}

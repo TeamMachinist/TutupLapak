@@ -26,7 +26,6 @@ type PurchaseService struct {
 }
 
 func (s *PurchaseService) CreatePurchase(ctx context.Context, req model.PurchaseRequest) (model.PurchaseResponse, error) {
-
 	resp, err := s.purchaseRepo.CreatePurchase(ctx, req)
 	if err != nil {
 		return model.PurchaseResponse{}, err

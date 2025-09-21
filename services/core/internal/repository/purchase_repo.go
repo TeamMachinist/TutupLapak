@@ -93,7 +93,7 @@ func (r *PurchaseRepository) CreatePurchase(ctx context.Context, req model.Purch
 		//  Ambil produk langsung dari DB (dalam transaksi)
 		productInTx, err := q.GetProductByID(ctx, itemReq.ProductID)
 		if err != nil {
-			return model.PurchaseResponse{}, errors.New("product not found in transaction")
+			return model.PurchaseResponse{}, errors.New("product not found")
 		}
 
 		//  Validasi stok

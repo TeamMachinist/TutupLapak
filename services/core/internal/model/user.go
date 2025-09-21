@@ -58,3 +58,21 @@ type UserResponse struct {
 	BankAccountHolder string `json:"bankAccountHolder"`
 	BankAccountNumber string `json:"bankAccountNumber"`
 }
+
+type CreateUserFromAuthRequest struct {
+	UserAuthID string `json:"user_auth_id"`
+	Email      string `json:"email"`
+	Phone      string `json:"phone"`
+}
+
+type CreateUserFromAuthResponse struct {
+	ID         string `json:"id"`
+	UserAuthID string `json:"user_auth_id"`
+	Email      string `json:"email"`
+	Phone      string `json:"phone"`
+}
+
+type GetUserFromAuthResponse struct {
+	ID         string `json:"id"`
+	UserAuthID string `json:"user_auth_id"`
+}

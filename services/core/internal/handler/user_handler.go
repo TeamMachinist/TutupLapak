@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/teammachinist/tutuplapak/internal"
+	"github.com/teammachinist/tutuplapak/services/auth/pkg/authz"
 	"github.com/teammachinist/tutuplapak/services/core/internal/model"
 	"github.com/teammachinist/tutuplapak/services/core/internal/service"
 
@@ -66,9 +66,8 @@ func (h *UserHandler) LinkPhone(c *fiber.Ctx) error {
 		})
 	}
 
-	// Get user ID from JWT token (already validated by middleware)
-	// TODO: Use authz package
-	userIDStr, ok := internal.GetUserIDFromFiber(c)
+	// Get user ID from authz
+	userIDStr, ok := authz.GetUserIDFromFiber(c)
 	if !ok {
 		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Authorization header required",
@@ -145,8 +144,8 @@ func (h *UserHandler) LinkEmail(c *fiber.Ctx) error {
 		})
 	}
 
-	// TODO: Use authz package
-	userIDStr, ok := internal.GetUserIDFromFiber(c)
+	// Get user ID from authz
+	userIDStr, ok := authz.GetUserIDFromFiber(c)
 	if !ok {
 		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Authorization header required",
@@ -186,8 +185,8 @@ func (h *UserHandler) LinkEmail(c *fiber.Ctx) error {
 }
 
 func (h *UserHandler) GetUserWithFileId(c *fiber.Ctx) error {
-	// TODO: Use authz package
-	userIDStr, ok := internal.GetUserIDFromFiber(c)
+	// Get user ID from authz
+	userIDStr, ok := authz.GetUserIDFromFiber(c)
 	if !ok {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "unauthorized: user not authenticated",
@@ -221,8 +220,8 @@ func (h *UserHandler) GetUserWithFileId(c *fiber.Ctx) error {
 func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 	ctx := c.Context()
 
-	// TODO: Use authz package
-	userIDStr, ok := internal.GetUserIDFromFiber(c)
+	// Get user ID from authz
+	userIDStr, ok := authz.GetUserIDFromFiber(c)
 	if !ok {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "unauthorized: user not authenticated",

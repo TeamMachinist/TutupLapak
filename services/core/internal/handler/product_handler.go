@@ -9,7 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/teammachinist/tutuplapak/internal"
+	"github.com/teammachinist/tutuplapak/services/auth/pkg/authz"
+	"github.com/teammachinist/tutuplapak/services/core/internal/logger"
 	"github.com/teammachinist/tutuplapak/services/core/internal/model"
 	"github.com/teammachinist/tutuplapak/services/core/internal/service"
 
@@ -111,6 +112,8 @@ func (h *ProductHandler) GetAllProducts(c *fiber.Ctx) error {
 }
 
 func (h *ProductHandler) CreateProduct(c *fiber.Ctx) error {
+	ctx := c.Context()
+
 	var req model.ProductRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -154,8 +157,8 @@ func (h *ProductHandler) CreateProduct(c *fiber.Ctx) error {
 		})
 	}
 
-	// TODO: Use authz package
-	userIDStr, ok := internal.GetUserIDFromFiber(c)
+	// Get user ID from authz
+	userIDStr, ok := authz.GetUserIDFromFiber(c)
 	if !ok {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "unauthorized: user not authenticated",
@@ -189,6 +192,7 @@ func (h *ProductHandler) CreateProduct(c *fiber.Ctx) error {
 				"error": "Invalid or expired token",
 			})
 		default:
+			logger.WarnCtx(ctx, "Failed to create product", "error", err.Error())
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "internal server error",
 			})
@@ -230,8 +234,8 @@ func (h *ProductHandler) UpdateProduct(c *fiber.Ctx) error {
 		})
 	}
 
-	// TODO: Use authz package
-	userIDStr, ok := internal.GetUserIDFromFiber(c)
+	// Get user ID from authz
+	userIDStr, ok := authz.GetUserIDFromFiber(c)
 	if !ok {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "unauthorized: user not authenticated",
@@ -328,8 +332,8 @@ func (h *ProductHandler) DeleteProduct(c *fiber.Ctx) error {
 		})
 	}
 
-	// TODO: Use authz package
-	userIDStr, ok := internal.GetUserIDFromFiber(c)
+	// Get user ID from authz
+	userIDStr, ok := authz.GetUserIDFromFiber(c)
 	if !ok {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "unauthorized: user not authenticated",

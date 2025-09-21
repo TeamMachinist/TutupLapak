@@ -7,9 +7,11 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/teammachinist/tutuplapak/services/auth/pkg/authz"
 	"github.com/teammachinist/tutuplapak/services/core/internal/cache"
 	"github.com/teammachinist/tutuplapak/services/core/internal/clients"
 	"github.com/teammachinist/tutuplapak/services/core/internal/database"
+	"github.com/teammachinist/tutuplapak/services/core/internal/logger"
 	"github.com/teammachinist/tutuplapak/services/core/internal/model"
 	"github.com/teammachinist/tutuplapak/services/core/internal/repository"
 
@@ -21,23 +23,28 @@ type UserServiceInterface interface {
 	LinkEmail(ctx context.Context, userID uuid.UUID, email string) (*model.LinkEmailResponse, error)
 	GetUserWithFileId(ctx context.Context, userID uuid.UUID) (model.UserResponse, error)
 	UpdateUser(ctx context.Context, userId uuid.UUID, req model.UserRequest) (model.UserResponse, error)
+	CreateUserFromAuth(ctx context.Context, req model.CreateUserFromAuthRequest) (*model.CreateUserFromAuthResponse, error)
+	GetUserFromAuth(ctx context.Context, userAuthUUID uuid.UUID) (*model.GetUserFromAuthResponse, error)
 }
 
 type UserService struct {
-	userRepo   repository.UserRepositoryInterface
-	fileClient clients.FileClientInterface
-	cache      *cache.RedisCache
+	userRepo    repository.UserRepositoryInterface
+	fileClient  clients.FileClientInterface
+	cache       *cache.RedisCache
+	authzClient *authz.AuthClient
 }
 
 func NewUserService(
 	userRepo repository.UserRepositoryInterface,
 	fileClient clients.FileClientInterface,
 	cache *cache.RedisCache,
+	authz *authz.AuthClient,
 ) UserServiceInterface {
 	return &UserService{
-		userRepo:   userRepo,
-		fileClient: fileClient,
-		cache:      cache,
+		userRepo:    userRepo,
+		fileClient:  fileClient,
+		cache:       cache,
+		authzClient: authz,
 	}
 }
 
@@ -64,52 +71,32 @@ func (s *UserService) LinkPhone(ctx context.Context, userID uuid.UUID, phone str
 		return nil, err
 	}
 
-	// TODO: Update phone in users_auth via authz package or http_client
-
-	// Get file data if fileID exists
-	var fileURI, fileThumbnailURI string
-	if user.FileID != nil {
-		if err := uuid.Validate(user.FileID.String()); err == nil {
-			file, err := s.fileClient.GetFileByID(ctx, *user.FileID)
-			if err == nil {
-				fileURI = file.FileURI
-				fileThumbnailURI = file.FileThumbnailURI
-			}
-		}
+	// Update auth service (sync, don't fail on error)
+	userAuthID := user.UserAuthID.String()
+	if err := s.authzClient.UpdateUserAuth(userAuthID, phone, ""); err != nil {
+		logger.WarnCtx(ctx, "Failed to sync phone with auth service",
+			"user_id", userID.String(),
+			"user_auth_id", userAuthID,
+			"error", err.Error())
 	}
 
-	// Build response
+	// Build response more efficiently
 	response := &model.LinkPhoneResponse{
-		FileID:            "",
-		FileURI:           fileURI,
-		FileThumbnailURI:  fileThumbnailURI,
-		BankAccountName:   "",
-		BankAccountHolder: "",
-		BankAccountNumber: "",
+		Email:             user.Email,
+		Phone:             user.Phone,
+		BankAccountName:   user.BankAccountName,
+		BankAccountHolder: user.BankAccountHolder,
+		BankAccountNumber: user.BankAccountNumber,
 	}
 
-	if user.Email != "" {
-		response.Email = user.Email
-	}
-
-	if user.Phone != "" {
-		response.Phone = user.Phone
-	}
-
-	if user.BankAccountName != "" {
-		response.BankAccountName = user.BankAccountName
-	}
-	if user.BankAccountHolder != "" {
-		response.BankAccountHolder = user.BankAccountHolder
-	}
-	if user.BankAccountNumber != "" {
-		response.BankAccountNumber = user.BankAccountNumber
-	}
-
-	if user.FileID != nil {
-		if err := uuid.Validate(user.FileID.String()); err == nil {
+	// Handle file data if exists
+	if user.FileID != nil && *user.FileID != uuid.Nil {
+		if file, err := s.fileClient.GetFileByID(ctx, *user.FileID); err == nil {
 			response.FileID = user.FileID.String()
+			response.FileURI = file.FileURI
+			response.FileThumbnailURI = file.FileThumbnailURI
 		}
+		// If file fetch fails, just leave these fields empty
 	}
 
 	return response, nil
@@ -138,7 +125,14 @@ func (s *UserService) LinkEmail(ctx context.Context, userID uuid.UUID, email str
 		return nil, err
 	}
 
-	// TODO: Update email in users_auth via authz package or http_client
+	// Update auth service (sync, don't fail on error)
+	userAuthID := user.UserAuthID.String()
+	if err := s.authzClient.UpdateUserAuth(userAuthID, "", email); err != nil {
+		logger.WarnCtx(ctx, "Failed to sync email with auth service",
+			"user_id", userID.String(),
+			"user_auth_id", userAuthID,
+			"error", err.Error())
+	}
 
 	// Get file data if fileID exists
 	var fileURI, fileThumbnailURI string
@@ -258,6 +252,18 @@ func (s *UserService) GetUserWithFileId(ctx context.Context, userID uuid.UUID) (
 		fmt.Printf("[UserFileList] Failed to set cache: %v", err)
 	}
 	return resp, nil
+}
+
+func (s *UserService) GetUserFromAuth(ctx context.Context, userAuthID uuid.UUID) (*model.GetUserFromAuthResponse, error) {
+	user, err := s.userRepo.GetUserByAuthID(ctx, userAuthID)
+	if err != nil {
+		return nil, errors.New("user does not exist")
+	}
+
+	return &model.GetUserFromAuthResponse{
+		ID:         user.ID.String(),
+		UserAuthID: user.UserAuthID.String(),
+	}, nil
 }
 
 func (s *UserService) UpdateUser(ctx context.Context,
@@ -390,4 +396,40 @@ func (s *UserService) validateEmail(email string) error {
 	}
 
 	return nil
+}
+
+func (s *UserService) CreateUserFromAuth(ctx context.Context, req model.CreateUserFromAuthRequest) (*model.CreateUserFromAuthResponse, error) {
+	// Validate user_auth_id
+	userAuthID, err := uuid.Parse(req.UserAuthID)
+	if err != nil {
+		return nil, errors.New("invalid user auth ID")
+	}
+
+	// Check if user already exists for this user_auth_id
+	existingUser, err := s.userRepo.GetUserByAuthID(ctx, userAuthID)
+	if err == nil {
+		// User already exists, return existing user
+		return &model.CreateUserFromAuthResponse{
+			ID:         existingUser.ID.String(),
+			UserAuthID: existingUser.UserAuthID.String(),
+			Email:      existingUser.Email,
+			Phone:      existingUser.Phone,
+		}, nil
+	}
+
+	// Generate new user ID
+	userID := uuid.New()
+
+	// Create user record
+	user, err := s.userRepo.CreateUserFromUserAuth(ctx, userID, userAuthID, req.Email, req.Phone)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create user: %w", err)
+	}
+
+	return &model.CreateUserFromAuthResponse{
+		ID:         user.ID.String(),
+		UserAuthID: user.UserAuthID.String(),
+		Email:      user.Email,
+		Phone:      user.Phone,
+	}, nil
 }

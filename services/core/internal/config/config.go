@@ -23,10 +23,11 @@ type RedisConfig struct {
 }
 
 type AppConfig struct {
-	Port       string
-	APITimeout time.Duration
-	FileUrl    string
-	Env        string
+	Port           string
+	APITimeout     time.Duration
+	FileUrl        string
+	AuthServiceURL string
+	Env            string
 }
 
 type DatabaseConfig struct {
@@ -63,9 +64,10 @@ func Load() (*Config, error) {
 
 	config := &Config{
 		App: AppConfig{
-			Port:    getEnv("PORT", "8002"),
-			FileUrl: getEnv("FILES_SERVICE_URL", "http://localhost:8003"),
-			Env:     getEnv("ENV", "development"),
+			Port:           getEnv("PORT", "8002"),
+			FileUrl:        getEnv("FILES_SERVICE_URL", "http://localhost:8003"),
+			AuthServiceURL: getEnv("AUTH_SERVICE_URL", "http://localhost:8001"),
+			Env:            getEnv("ENV", "development"),
 		},
 		Database: DatabaseConfig{
 			Host:        getEnv("DB_HOST", "localhost"),

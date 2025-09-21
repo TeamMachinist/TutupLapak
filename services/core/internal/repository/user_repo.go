@@ -15,6 +15,8 @@ type UserRepositoryInterface interface {
 	CheckPhoneExists(ctx context.Context, phone string) (bool, error)
 	CheckEmailExists(ctx context.Context, email string) (bool, error)
 	UpdateUserEmail(ctx context.Context, userID uuid.UUID, email string) error
+	GetUserByAuthID(ctx context.Context, userAuthID uuid.UUID) (database.Users, error)
+	CreateUserFromUserAuth(ctx context.Context, userID, userAuthID uuid.UUID, email, phone string) (database.Users, error)
 }
 
 type UserRepository struct {
@@ -73,4 +75,30 @@ func (r *UserRepository) UpdateUserEmail(ctx context.Context, userID uuid.UUID, 
 		Email: email,
 	})
 	return err
+}
+
+func (r *UserRepository) GetUserByAuthID(ctx context.Context, userAuthID uuid.UUID) (database.Users, error) {
+	rows, err := r.db.GetUserByAuthID(ctx, userAuthID)
+	if err != nil {
+		return database.Users{}, err
+	}
+	return rows, nil
+}
+
+func (r *UserRepository) CreateUserFromUserAuth(ctx context.Context, userID, userAuthID uuid.UUID, email, phone string) (database.Users, error) {
+	result, err := r.db.CreateUserFromUserAuth(ctx, database.CreateUserFromUserAuthParams{
+		ID:                userID,
+		UserAuthID:        userAuthID,
+		FileID:            nil,
+		Email:             email,
+		Phone:             phone,
+		BankAccountName:   "",
+		BankAccountHolder: "",
+		BankAccountNumber: "",
+	})
+	if err != nil {
+		return database.Users{}, err
+	}
+
+	return result, nil
 }

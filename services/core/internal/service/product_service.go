@@ -14,6 +14,7 @@ import (
 	"github.com/teammachinist/tutuplapak/services/core/internal/cache"
 	"github.com/teammachinist/tutuplapak/services/core/internal/clients"
 	"github.com/teammachinist/tutuplapak/services/core/internal/database"
+	"github.com/teammachinist/tutuplapak/services/core/internal/logger"
 	"github.com/teammachinist/tutuplapak/services/core/internal/model"
 	"github.com/teammachinist/tutuplapak/services/core/internal/repository"
 
@@ -84,6 +85,8 @@ func (s *ProductService) CreateProduct(ctx context.Context, req model.ProductReq
 		}
 		file = f
 	}
+
+	logger.DebugCtx(ctx, "Get request information", "request", req)
 
 	// Create product
 	productResp, err := s.productRepo.CreateProduct(ctx, req)
