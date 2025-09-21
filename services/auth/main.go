@@ -97,7 +97,8 @@ func main() {
 	router.GET("/readyz", healthHandler.ReadinessCheck)
 
 	// Authentication endpoints
-	v1 := router.Group("/api/v1")
+	// v1 := router.Group("/api/v1")
+	v1 := router.Group("/v1")
 	{
 		v1.POST("/login/phone", userHandler.LoginByPhone)
 		v1.POST("/register/phone", userHandler.RegisterByPhone)

@@ -40,7 +40,7 @@ func NewFileClient(baseURL string) *FileClient {
 }
 
 func (fc *FileClient) GetFileByID(ctx context.Context, fileID uuid.UUID) (*FileMetadataResponse, error) {
-	url := fmt.Sprintf("%s/api/v1/file/%s", fc.BaseURL, fileID.String())
+	url := fmt.Sprintf("%s/v1/file/%s", fc.BaseURL, fileID.String())
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -88,7 +88,7 @@ func (fc *FileClient) GetFilesByIDList(ctx context.Context, fileIDs []string) ([
 
 	fmt.Println(`print disini saja bos:`, joinId)
 
-	baseURL := fmt.Sprintf("%s/api/v1/file", fc.BaseURL)
+	baseURL := fmt.Sprintf("%s/v1/file", fc.BaseURL)
 	reqURL := fmt.Sprintf("%s?%s", baseURL, query.Encode())
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
@@ -120,4 +120,3 @@ func (fc *FileClient) GetFilesByIDList(ctx context.Context, fileIDs []string) ([
 
 	return filesResp, nil
 }
-

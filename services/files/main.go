@@ -190,11 +190,14 @@ func setupRoutes(services Services, deps Dependencies) *chi.Mux {
 
 	// Pragmatically no auth for now, easier fetch for user and core services
 	// Can be changed to use `internal` prefix later, follow auth service design
-	r.Get("/api/v1/file/{fileId}", services.FileHandler.GetFile)
-	r.Get("/api/v1/file", services.FileHandler.GetFiles)
+	// r.Get("/api/v1/file/{fileId}", services.FileHandler.GetFile)
+	// r.Get("/api/v1/file", services.FileHandler.GetFiles)
+	r.Get("/v1/file/{fileId}", services.FileHandler.GetFile)
+	r.Get("/v1/file", services.FileHandler.GetFiles)
 
 	// API routes with authentication
-	r.Route("/api/v1", func(r chi.Router) {
+	// r.Route("/api/v1", func(r chi.Router) {
+	r.Route("/v1", func(r chi.Router) {
 		r.Use(deps.AuthMiddleware.ChiMiddleware)
 		r.Post("/file", services.FileHandler.UploadFile)
 		// r.Get("/file/{fileId}", services.FileHandler.GetFile)
