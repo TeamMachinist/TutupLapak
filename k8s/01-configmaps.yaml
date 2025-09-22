@@ -12,7 +12,7 @@ data:
   # Database config
   DATABASE_URL: "postgres://user:password@main-db:5432/tutuplapak?sslmode=disable"
   REDIS_ADDR: "redis:6379"
-  REDIS_PASSWORD: "redispass"
+  REDIS_PASSWORD: ""
   REDIS_DB: "0"
   
   # JWT config
@@ -34,12 +34,12 @@ data:
   # Server config
   ENV: "production"
   PORT: "8002"
-  API_TIMEOUT: 30s
+  API_TIMEOUT: "30s"
   
   # Database config
   DATABASE_URL: "postgres://user:password@main-db:5432/tutuplapak?sslmode=disable"
   REDIS_ADDR: "redis:6379"
-  REDIS_PASSWORD: "redispass"
+  REDIS_PASSWORD: ""
   REDIS_DB: "0"
   
   # Service URLs (internal k8s communication)
@@ -60,7 +60,7 @@ data:
   # Database config
   DATABASE_URL: "postgres://user:password@main-db:5432/tutuplapak?sslmode=disable"
   REDIS_ADDR: "redis:6379"
-  REDIS_PASSWORD: "redispass"
+  REDIS_PASSWORD: ""
   REDIS_DB: "0"
   
   # MinIO config
@@ -69,6 +69,84 @@ data:
   MINIO_SECRET_KEY: "miniosecret"
   MINIO_BUCKET: "tutuplapak-files"
   MINIO_USE_SSL: "false"
+  
+  # Service URLs (internal k8s communication)
+  AUTH_SERVICE_URL: "http://auth-service.machinist-tutuplapak.svc.cluster.local:8001"
+  CORE_SERVICE_URL: "http://core-service.machinist-tutuplapak.svc.cluster.local:8002"
+
+---
+# ConfigMap for managed infrastructure (use during load test)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: auth-config-managed
+  namespace: machinist-tutuplapak
+data:
+  # Server config
+  ENV: "production"
+  GIN_MODE: "release"
+  PORT: "8001"
+  
+  # Database config - UPDATE THESE WITH ACTUAL MANAGED DB CREDENTIALS
+  DATABASE_URL: "postgres://managed_user:managed_password@managed-db-host:5432/tutuplapak?sslmode=disable"
+  REDIS_ADDR: "managed-redis-host:6379"
+  REDIS_PASSWORD: "managed_redis_password"
+  REDIS_DB: "0"
+  
+  # JWT config
+  JWT_SECRET: "tutupsecret"
+  JWT_DURATION: "24h"
+  JWT_ISSUER: "tutuplapak-auth"
+  
+  # Service URLs (internal k8s communication)
+  CORE_SERVICE_URL: "http://core-service.machinist-tutuplapak.svc.cluster.local:8002"
+  FILES_SERVICE_URL: "http://files-service.machinist-tutuplapak.svc.cluster.local:8003"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: core-config-managed
+  namespace: machinist-tutuplapak
+data:
+  # Server config
+  ENV: "production"
+  PORT: "8002"
+  API_TIMEOUT: "30s"
+  
+  # Database config - UPDATE THESE WITH ACTUAL MANAGED DB CREDENTIALS
+  DATABASE_URL: "postgres://managed_user:managed_password@managed-db-host:5432/tutuplapak?sslmode=disable"
+  REDIS_ADDR: "managed-redis-host:6379"
+  REDIS_PASSWORD: "managed_redis_password"
+  REDIS_DB: "0"
+  
+  # Service URLs (internal k8s communication)
+  AUTH_SERVICE_URL: "http://auth-service.machinist-tutuplapak.svc.cluster.local:8001"
+  FILES_SERVICE_URL: "http://files-service.machinist-tutuplapak.svc.cluster.local:8003"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: files-config-managed
+  namespace: machinist-tutuplapak
+data:
+  # Server config
+  ENV: "production"
+  PORT: "8003"
+  
+  # Database config - UPDATE THESE WITH ACTUAL MANAGED DB CREDENTIALS
+  DATABASE_URL: "postgres://managed_user:managed_password@managed-db-host:5432/tutuplapak?sslmode=disable"
+  REDIS_ADDR: "managed-redis-host:6379"
+  REDIS_PASSWORD: "managed_redis_password"
+  REDIS_DB: "0"
+  
+  # MinIO config - UPDATE THESE WITH ACTUAL MANAGED MINIO CREDENTIALS
+  MINIO_ENDPOINT: "managed-minio-host:9000"
+  MINIO_ACCESS_KEY: "managed_minio_access"
+  MINIO_SECRET_KEY: "managed_minio_secret"
+  MINIO_BUCKET: "tutuplapak-files"
+  MINIO_USE_SSL: "true"
   
   # Service URLs (internal k8s communication)
   AUTH_SERVICE_URL: "http://auth-service.machinist-tutuplapak.svc.cluster.local:8001"

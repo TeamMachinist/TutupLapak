@@ -30,6 +30,14 @@ spec:
           limits:
             memory: "1Gi"
             cpu: "1000m"
+        startupProbe:
+          httpGet:
+            path: /healthz
+            port: 8001
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 10
         livenessProbe:
           httpGet:
             path: /healthz
@@ -80,6 +88,14 @@ spec:
           limits:
             memory: "1.5Gi"
             cpu: "1500m"
+        startupProbe:
+          httpGet:
+            path: /healthz
+            port: 8002
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 10
         livenessProbe:
           httpGet:
             path: /healthz
@@ -130,6 +146,14 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "500m"
+        startupProbe:
+          httpGet:
+            path: /healthz
+            port: 8003
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 10
         livenessProbe:
           httpGet:
             path: /healthz
