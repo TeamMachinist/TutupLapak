@@ -1,0 +1,90 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tutuplapak-ingress
+  namespace: machinist-tutuplapak
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: default-compress@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: tutuplapak.machinist.local  # Update this with your actual domain
+    http:
+      paths:
+      - path: /v1/login
+        pathType: Prefix
+        backend:
+          service:
+            name: auth-service
+            port:
+              number: 8001
+      - path: /v1/register
+        pathType: Prefix
+        backend:
+          service:
+            name: auth-service
+            port:
+              number: 8001
+      - path: /internal/validate
+        pathType: Prefix
+        backend:
+          service:
+            name: auth-service
+            port:
+              number: 8001
+      - path: /internal/userauth
+        pathType: Prefix
+        backend:
+          service:
+            name: auth-service
+            port:
+              number: 8001
+      - path: /v1/user
+        pathType: Prefix
+        backend:
+          service:
+            name: core-service
+            port:
+              number: 8002
+      - path: /v1/product
+        pathType: Prefix
+        backend:
+          service:
+            name: core-service
+            port:
+              number: 8002
+      - path: /v1/purchase
+        pathType: Prefix
+        backend:
+          service:
+            name: core-service
+            port:
+              number: 8002
+      - path: /internal/user
+        pathType: Prefix
+        backend:
+          service:
+            name: core-service
+            port:
+              number: 8002
+      - path: /v1/file
+        pathType: Prefix
+        backend:
+          service:
+            name: files-service
+            port:
+              number: 8003
+      - path: /healthz
+        pathType: Prefix
+        backend:
+          service:
+            name: auth-service
+            port:
+              number: 8001
+      - path: /readyz
+        pathType: Prefix
+        backend:
+          service:
+            name: auth-service
+            port:
+              number: 8001

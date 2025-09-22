@@ -34,10 +34,14 @@ func main() {
 		log.Fatal("Failed to load config:", err)
 	}
 
-	logger.Init()
+	enablePrefork, networkType, concurrency := getOptimalFiberConfig(cfg.App.Env)
 
 	database, err := database.NewDatabase(ctx, cfg.Database.DatabaseURL)
 	if err != nil {
+		if enablePrefork {
+			log.Printf("Database connection failed in prefork mode, retrying without prefork...")
+			// Could implement fallback logic here
+		}
 		log.Fatal("Failed to connect to database:", err)
 	}
 	defer database.Close()
@@ -45,26 +49,24 @@ func main() {
 	redisClient := cache.NewRedisCache(cache.CacheConfig(cfg.Redis))
 	defer redisClient.Close()
 
-	var enablePrefork bool
-	if cfg.App.Env == "production" {
-		enablePrefork = true
-	}
+	// enablePrefork, networkType, concurrency := getOptimalFiberConfig(cfg.App.Env)
 
 	app := fiber.New(fiber.Config{
-		Prefork: enablePrefork,
-		AppName: "Core Service v1.0",
-		Network: "tcp",
+		Prefork:     enablePrefork,
+		Network:     networkType,
+		Concurrency: concurrency,
+		AppName:     "Core Service v1.0",
+		ErrorHandler: func(c *fiber.Ctx, err error) error {
+			log.Printf("Fiber error: %v", err)
+			return c.Status(500).JSON(fiber.Map{"error": "Internal Server Error"})
+		},
 	})
+
+	log.Printf("Core service starting with prefork=%v, network=%s, concurrency=%d",
+		enablePrefork, networkType, concurrency)
 
 	app.Use(fiberlog.New())
 	app.Use(requestid.New())
-
-	// app.Get("/healthz", func(c *fiber.Ctx) error {
-	// 	return c.JSON(fiber.Map{
-	// 		"status":  "healthy",
-	// 		"service": "core",
-	// 	})
-	// })
 
 	// Initiate auth middleware and client
 	authClient := authz.NewAuthClient(cfg.App.AuthServiceURL)
@@ -90,9 +92,10 @@ func main() {
 	app.Get("/healthz", healthHandler.HealthCheck)
 	app.Get("/readyz", healthHandler.ReadinessCheck)
 
-	api := app.Group("/api/v1")
+	// v1 := app.Group("/api/v1")
+	v1 := app.Group("/v1")
 
-	products := api.Group("/product")
+	products := v1.Group("/product")
 	{
 		products.Get("", productHandler.GetAllProducts)
 		products.Post("", authMiddleware.FiberMiddleware(), productHandler.CreateProduct)
@@ -102,7 +105,7 @@ func main() {
 	}
 
 	// User management endpoints (auth-protected)
-	user := api.Group("/user")
+	user := v1.Group("/user")
 	{
 		user.Post("/link/phone", authMiddleware.FiberMiddleware(), userHandler.LinkPhone)
 		user.Post("/link/email", authMiddleware.FiberMiddleware(), userHandler.LinkEmail)
@@ -110,7 +113,7 @@ func main() {
 		user.Put("", authMiddleware.FiberMiddleware(), userHandler.UpdateUser)
 	}
 
-	purchase := api.Group("/purchase")
+	purchase := v1.Group("/purchase")
 	{
 		purchase.Post("", purchaseHandler.CreatePurchase)
 		purchase.Post("/:purchaseId", purchaseHandler.UploadPaymentProof)
@@ -135,4 +138,13 @@ func main() {
 	if err := app.Listen(":" + cfg.App.Port); err != nil {
 		log.Fatal("Server failed to start:", err)
 	}
+}
+
+func getOptimalFiberConfig(env string) (bool, string, int) {
+	if env == "production" {
+		// 2 processes per container for optimal CPU usage
+		// return true, "tcp4", 2
+		return false, "tcp4", 1
+	}
+	return false, "tcp", 1
 }
