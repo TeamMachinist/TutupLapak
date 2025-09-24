@@ -12,7 +12,7 @@ type User struct {
 }
 
 type LinkPhoneRequest struct {
-	Phone string `json:"phone" binding:"required"`
+	Phone string `json:"phone" validate:"required,phone_format"`
 }
 
 type LinkPhoneResponse struct {

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"reflect"
 	"regexp"
 	"strings"
 
@@ -23,90 +24,90 @@ func NewUserHandler(userService service.UserServiceInterface) *UserHandler {
 }
 
 func (h *UserHandler) LinkPhone(c *fiber.Ctx) error {
-	var req model.LinkPhoneRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
+	// 1. Cek body kosong
+	if len(c.Body()) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Request body is required",
 		})
 	}
 
-	// Validate request
+	var req model.LinkPhoneRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid JSON format",
+		})
+	}
+
+	// 2. Setup validator dengan custom rule
 	validate := validator.New()
 	validate.RegisterValidation("phone_format", func(fl validator.FieldLevel) bool {
 		phone := fl.Field().String()
 		if phone == "" {
 			return false
 		}
-
-		// Check if phone starts with "+"
 		if !strings.HasPrefix(phone, "+") {
 			return false
 		}
-
-		// Validate phone format (international format)
 		phoneRegex := regexp.MustCompile(`^\+[1-9]\d{1,14}$`)
 		return phoneRegex.MatchString(phone)
 	})
 
+	// 3. Validasi
 	if err := validate.Struct(req); err != nil {
 		var details []string
 		for _, ve := range err.(validator.ValidationErrors) {
+			fieldName := getJSONTagName(ve.StructNamespace(), reflect.TypeOf(model.LinkPhoneRequest{}))
 			switch ve.Tag() {
 			case "required":
-				details = append(details, "phone is required")
+				details = append(details, fieldName+" is required")
 			case "phone_format":
-				details = append(details, "phone must start with international calling code prefix '+' and be valid format")
+				details = append(details, fieldName+" must start with '+' and be a valid international number")
 			default:
-				details = append(details, "phone is not valid")
+				details = append(details, fieldName+" is not valid")
 			}
 		}
-		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error":   "Validation error",
 			"details": details,
 		})
 	}
 
-	// Get user ID from authz
+	// 4. Auth
 	userIDStr, ok := authz.GetUserIDFromFiber(c)
 	if !ok {
-		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Authorization header required",
 		})
 	}
-
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Invalid user id in token",
 		})
 	}
 
-	// Call service to link phone
+	// 5. Service
 	resp, err := h.userService.LinkPhone(c.Context(), userID, req.Phone)
 	if err != nil {
 		switch err.Error() {
 		case "phone is taken":
-			return c.Status(http.StatusConflict).JSON(fiber.Map{
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
 				"error": "Phone is taken",
 			})
-		case "phone must start with international calling code prefix '+'":
-			return c.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": "Phone must start with international calling code prefix '+'",
-			})
-		case "invalid phone number format":
-			return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+		case "phone must start with international calling code prefix '+'",
+			"invalid phone number format":
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": "Invalid phone number format",
 			})
 		default:
-			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "Internal server error",
 			})
 		}
 	}
 
-	return c.Status(http.StatusOK).JSON(resp)
+	return c.Status(fiber.StatusOK).JSON(resp)
 }
-
 func (h *UserHandler) LinkEmail(c *fiber.Ctx) error {
 	var req model.LinkEmailRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -218,44 +219,26 @@ func (h *UserHandler) GetUserWithFileId(c *fiber.Ctx) error {
 }
 
 func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
-	ctx := c.Context()
-
-	// Get user ID from authz
-	userIDStr, ok := authz.GetUserIDFromFiber(c)
-	if !ok {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "unauthorized: user not authenticated",
+	// 1. Cek body kosong
+	if len(c.Body()) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Request body is required",
 		})
 	}
 
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "invalid user id in token",
-		})
-	}
-
-	req := model.UserRequest{}
+	var req model.UserRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": err.Error(),
+			"error": "Invalid JSON format",
 		})
 	}
 
-	if req.FileID != nil {
-		if err := uuid.Validate(*req.FileID); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error":   "Validation error",
-				"details": "fileId is not valid",
-			})
-		}
-	}
-
+	// 2. Validasi
 	validate := validator.New()
 	if err := validate.Struct(req); err != nil {
 		var details []string
 		for _, ve := range err.(validator.ValidationErrors) {
-			fieldName := getJSONTagName(ve.StructNamespace())
+			fieldName := getJSONTagName(ve.StructNamespace(), reflect.TypeOf(model.UserRequest{}))
 			switch ve.Tag() {
 			case "required":
 				details = append(details, fieldName+" is required")
@@ -273,19 +256,44 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 		})
 	}
 
-	rows, err := h.userService.UpdateUser(ctx, userID, req)
+	// 3. Validasi FileID jika ada
+	if req.FileID != nil {
+		if _, err := uuid.Parse(*req.FileID); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error":   "Validation error",
+				"details": []string{"fileId is not a valid UUID"},
+			})
+		}
+	}
+
+	// 4. Auth
+	userIDStr, ok := authz.GetUserIDFromFiber(c)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "unauthorized: user not authenticated",
+		})
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "invalid user id in token",
+		})
+	}
+
+	// 5. Service
+	rows, err := h.userService.UpdateUser(c.Context(), userID, req)
 	if err != nil {
 		switch err.Error() {
 		case "file not found":
-			return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": "fileId is not valid / exists",
 			})
 		case "unauthorized: you don't own this file":
-			return c.Status(http.StatusForbidden).JSON(fiber.Map{
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
 				"error": "you don't own this file",
 			})
 		default:
-			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "Server error",
 			})
 		}

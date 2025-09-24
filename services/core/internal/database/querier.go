@@ -13,7 +13,9 @@ import (
 type Querier interface {
 	CheckEmailExists(ctx context.Context, email string) (bool, error)
 	CheckPhoneExists(ctx context.Context, email string) (bool, error)
+	CheckProductExists(ctx context.Context, id uuid.UUID) (bool, error)
 	CheckProductOwnership(ctx context.Context, arg CheckProductOwnershipParams) (bool, error)
+	CheckPuchaseExist(ctx context.Context, purchaseid uuid.UUID) (bool, error)
 	CheckSKUExistsByUser(ctx context.Context, arg CheckSKUExistsByUserParams) (CheckSKUExistsByUserRow, error)
 	CreateProduct(ctx context.Context, arg CreateProductParams) (Products, error)
 	CreatePurchase(ctx context.Context, arg CreatePurchaseParams) error

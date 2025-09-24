@@ -18,11 +18,17 @@ type PurchaseRepositoryInterface interface {
 	CreatePurchase(ctx context.Context, req model.PurchaseRequest) (model.PurchaseResponse, error)
 	GetPurchaseByid(ctx context.Context, purchaseId string) (model.PurchaseResponse, error)
 	UpdatePurchaseStatus(ctx context.Context, purchaseId string, newStatus database.PurchaseStatus) error
+	CheckPurchaseExist(ctx context.Context, purchaseId string) (bool, error)
 }
 
 type PurchaseRepository struct {
 	db     *pgxpool.Pool
 	dbSqlc database.Querier
+}
+
+// CheckPurchaseExist implements PurchaseRepositoryInterface.
+func (r *PurchaseRepository) CheckPurchaseExist(ctx context.Context, purchaseId string) (bool, error) {
+	return r.dbSqlc.CheckPuchaseExist(ctx, uuid.MustParse(purchaseId))
 }
 
 // GetPurchaseByid implements PurchaseRepositoryInterface.

@@ -40,7 +40,7 @@ func (h *PurchaseHandler) CreatePurchase(c *fiber.Ctx) error {
 		if item.ProductID == uuid.Nil {
 			return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "productId is required"})
 		}
-		if item.Qty < 2 { // ← min: 2, bukan 1
+		if item.Qty < 1 { // ← min: 2, bukan 1
 			return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "qty must be at least 2"})
 		}
 	}
@@ -112,8 +112,12 @@ func (h *PurchaseHandler) UploadPaymentProof(c *fiber.Ctx) error {
 	err := h.purchaseService.UploadPaymentProof(c.Context(), purchaseId, body.FileIds)
 	if err != nil {
 		// Handle error secara spesifik
-		if strings.Contains(err.Error(), "purchase not found") ||
-			strings.Contains(err.Error(), "purchase is already paid") ||
+
+		if strings.Contains(err.Error(), "purchase not found") {
+			return c.SendStatus(fiber.StatusNotFound)
+		}
+
+		if strings.Contains(err.Error(), "purchase is already paid") ||
 			strings.Contains(err.Error(), "expected") ||
 			strings.Contains(err.Error(), "invalid or non-existent file IDs") ||
 			strings.Contains(err.Error(), "invalid request body") {

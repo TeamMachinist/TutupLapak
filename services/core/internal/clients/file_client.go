@@ -15,10 +15,9 @@ import (
 )
 
 type FileMetadataResponse struct {
-	ID               uuid.UUID `json:"id"`
-	UserID           string    `json:"user_id"`
-	FileURI          string    `json:"file_uri"`
-	FileThumbnailURI string    `json:"file_thumbnail_uri"`
+	ID               uuid.UUID `json:"fileId"`
+	FileURI          string    `json:"fileUri"`
+	FileThumbnailURI string    `json:"fileThumbnailUri"`
 	CreatedAt        time.Time `json:"created_at"`
 }
 

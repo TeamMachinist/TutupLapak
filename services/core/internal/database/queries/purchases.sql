@@ -16,3 +16,6 @@ UPDATE purchases
 SET status = @status::purchase_status,
     updated_at = NOW()
 WHERE id = @purchaseId::uuid;
+
+-- name: CheckPuchaseExist :one
+SELECT EXISTS(SELECT 1 FROM purchases WHERE id = @purchaseId::uuid);
