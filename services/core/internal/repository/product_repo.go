@@ -16,6 +16,7 @@ import (
 type ProductRepositoryInterface interface {
 	CreateProduct(ctx context.Context, req model.ProductRequest) (model.ProductResponse, error)
 	CheckSKUExistsByUser(ctx context.Context, sku string, userID uuid.UUID) (CheckSKUExistsByUserRow, error)
+	CheckProductExists(ctx context.Context, id uuid.UUID) (bool, error)
 	GetAllProducts(ctx context.Context, params model.GetAllProductsParams) ([]model.Product, error)
 	UpdateProduct(ctx context.Context, params database.UpdateProductParams) (database.UpdateProductRow, error)
 	CheckProductOwnership(ctx context.Context, productID uuid.UUID, userID uuid.UUID) (bool, error)
@@ -25,6 +26,11 @@ type ProductRepositoryInterface interface {
 
 type ProductRepository struct {
 	db database.Querier
+}
+
+// CheckProductExists implements ProductRepositoryInterface.
+func (r *ProductRepository) CheckProductExists(ctx context.Context, id uuid.UUID) (bool, error) {
+	return r.db.CheckProductExists(ctx, id)
 }
 
 // UpdateProductQty implements ProductRepositoryInterface.

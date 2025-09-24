@@ -11,6 +11,17 @@ import (
 	"github.com/google/uuid"
 )
 
+const checkPuchaseExist = `-- name: CheckPuchaseExist :one
+SELECT EXISTS(SELECT 1 FROM purchases WHERE id = $1::uuid)
+`
+
+func (q *Queries) CheckPuchaseExist(ctx context.Context, purchaseid uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, checkPuchaseExist, purchaseid)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const createPurchase = `-- name: CreatePurchase :exec
 INSERT INTO purchases (
     id, sender_name, sender_contact_type, sender_contact_detail,

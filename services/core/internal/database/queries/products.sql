@@ -31,6 +31,9 @@ FROM products
 WHERE sku = @sku::text AND user_id = @user_id::uuid
 LIMIT 1;
 
+-- name: CheckProductExists :one
+SELECT EXISTS(SELECT 1 FROM products WHERE id = @id::uuid);
+
 -- name: GetAllProducts :many
 SELECT 
     p.id,
@@ -49,7 +52,7 @@ WHERE
     AND p.sku = COALESCE(NULLIF(@sku::text, ''), p.sku)
     AND p.category = COALESCE(NULLIF(@category::text, ''), p.category)
 ORDER BY 
-    CASE WHEN @sort_by::text = 'newest' THEN GREATEST(p.created_at, p.updated_at) END DESC,
+    CASE WHEN @sort_by::text = 'newest' THEN p.created_at END DESC,
     CASE WHEN @sort_by::text = 'oldest' THEN LEAST(p.created_at, p.updated_at) END ASC,
     CASE WHEN @sort_by::text = 'cheapest' THEN p.price END ASC,
     CASE WHEN @sort_by::text = 'expensive' THEN p.price END DESC,

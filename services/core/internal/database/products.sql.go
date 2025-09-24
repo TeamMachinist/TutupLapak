@@ -12,6 +12,17 @@ import (
 	"github.com/google/uuid"
 )
 
+const checkProductExists = `-- name: CheckProductExists :one
+SELECT EXISTS(SELECT 1 FROM products WHERE id = $1::uuid)
+`
+
+func (q *Queries) CheckProductExists(ctx context.Context, id uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, checkProductExists, id)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const checkProductOwnership = `-- name: CheckProductOwnership :one
 SELECT EXISTS(
     SELECT 1 FROM products
@@ -157,7 +168,7 @@ WHERE
     AND p.sku = COALESCE(NULLIF($2::text, ''), p.sku)
     AND p.category = COALESCE(NULLIF($3::text, ''), p.category)
 ORDER BY 
-    CASE WHEN $4::text = 'newest' THEN GREATEST(p.created_at, p.updated_at) END DESC,
+    CASE WHEN $4::text = 'newest' THEN p.created_at END DESC,
     CASE WHEN $4::text = 'oldest' THEN LEAST(p.created_at, p.updated_at) END ASC,
     CASE WHEN $4::text = 'cheapest' THEN p.price END ASC,
     CASE WHEN $4::text = 'expensive' THEN p.price END DESC,

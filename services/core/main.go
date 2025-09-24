@@ -144,7 +144,7 @@ func getOptimalFiberConfig(env string) (bool, string, int) {
 	if env == "production" {
 		// 2 processes per container for optimal CPU usage
 		// return true, "tcp4", 2
-		return false, "tcp4", 1
+		return false, "tcp4", 0
 	}
-	return false, "tcp", 1
+	return false, "tcp", 0
 }

@@ -304,10 +304,10 @@ func (s *UserService) UpdateUser(ctx context.Context,
 			file = clientFile
 		}
 
-		// Check Ownership
-		if userID.String() != file.UserID {
-			return model.UserResponse{}, errors.New("unauthorized: you don't own this file")
-		}
+		// // Check Ownership
+		// if userID.String() != file.UserID {
+		// 	return model.UserResponse{}, errors.New("unauthorized: you don't own this file")
+		// }
 
 		fileID = file.ID.String()
 		fileURI = file.FileURI

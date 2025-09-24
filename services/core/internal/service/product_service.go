@@ -149,9 +149,11 @@ func (s *ProductService) GetAllProducts(ctx context.Context, filter model.GetAll
 		responses = append(responses, resp)
 	}
 
-	err = s.cache.Set(ctx, key, responses, cache.ProductListTTL)
-	if err != nil {
-		log.Printf("[GetAllProducts] Failed to set cache: %v", err)
+	if len(responses) != 0 {
+		err = s.cache.Set(ctx, key, responses, cache.ProductListTTL)
+		if err != nil {
+			log.Printf("[GetAllProducts] Failed to set cache: %v", err)
+		}
 	}
 
 	return responses, nil
@@ -163,6 +165,14 @@ func (s *ProductService) UpdateProduct(
 	req model.ProductRequest,
 	userID uuid.UUID,
 ) (model.ProductResponse, error) {
+
+	// _, err := s.productRepo.CheckProductExists(ctx, productID)
+	// if err != nil {
+	// 	if errors.Is(err, sql.ErrNoRows) {
+	// 		return model.ProductResponse{}, errors.New("product doesn't exist")
+	// 	}
+	// 	return model.ProductResponse{}, fmt.Errorf("failed to check product: %w", err)
+	// }
 
 	owned, err := s.productRepo.CheckProductOwnership(ctx, productID, userID)
 	if err != nil {
@@ -248,6 +258,14 @@ func (s *ProductService) UpdateProduct(
 }
 
 func (s *ProductService) DeleteProduct(ctx context.Context, productID uuid.UUID, userID uuid.UUID) error {
+	_, err := s.productRepo.CheckProductExists(ctx, productID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return errors.New("product doesn't exist")
+		}
+		return fmt.Errorf("failed to check product: %w", err)
+	}
+
 	owned, err := s.productRepo.CheckProductOwnership(ctx, productID, userID)
 	if err != nil {
 		// fmt.Printf("Error checking ownership: %v\n", err)

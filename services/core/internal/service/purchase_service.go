@@ -47,10 +47,19 @@ func (s *PurchaseService) CreatePurchase(ctx context.Context, req model.Purchase
 
 // UploadPaymentProof implements PurchaseServiceInterface.
 func (s *PurchaseService) UploadPaymentProof(ctx context.Context, purchaseId string, req []string) error {
+
+	// _, err := s.purchaseRepo.CheckPurchaseExist(ctx, purchaseId)
+	// if err != nil {
+	// 	if errors.Is(err, sql.ErrNoRows) {
+	// 		return errors.New("purchase not found")
+	// 	}
+	// 	return fmt.Errorf("failed to check purchase: %w", err)
+	// }
+
 	// Ambil purchase by ID
 	purchase, err := s.purchaseRepo.GetPurchaseByid(ctx, purchaseId)
 	if err != nil {
-		return fmt.Errorf("failed to get purchase: %w", err)
+		return errors.New("purchase not found")
 	}
 	if purchase.PurchaseID == uuid.Nil {
 		return errors.New("purchase not found")

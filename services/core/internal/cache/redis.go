@@ -34,8 +34,8 @@ const (
 	FileMetadataTTL = 1 * time.Hour    // File metadata rarely changes
 	FileListTTL     = 30 * time.Minute // User file lists change more often
 	FileExistsTTL   = 5 * time.Minute  // Quick existence checks
-	ProductListTTL  = 10 * time.Minute // Product search results
-	ProductTTL      = 30 * time.Minute // Individual products
+	ProductListTTL  = 1 * time.Minute  // Product search results
+	ProductTTL      = 1 * time.Minute  // Individual products
 	UserProfileTTL  = 15 * time.Minute // User profiles
 )
 

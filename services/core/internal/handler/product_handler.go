@@ -138,7 +138,7 @@ func (h *ProductHandler) CreateProduct(c *fiber.Ctx) error {
 	if err := validate.Struct(req); err != nil {
 		var details []string
 		for _, ve := range err.(validator.ValidationErrors) {
-			fieldName := getJSONTagName(ve.StructNamespace())
+			fieldName := getJSONTagName(ve.StructNamespace(), reflect.TypeOf(req))
 			switch ve.Tag() {
 			case "required":
 				details = append(details, fieldName+" is required")
@@ -202,15 +202,14 @@ func (h *ProductHandler) CreateProduct(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(productResp)
 }
 
-func getJSONTagName(fieldPath string) string {
+func getJSONTagName(fieldPath string, structType reflect.Type) string {
 	parts := strings.Split(fieldPath, ".")
 	if len(parts) == 0 {
 		return fieldPath
 	}
 	fieldName := parts[len(parts)-1]
 
-	t := reflect.TypeOf(model.ProductRequest{})
-	if f, ok := t.FieldByName(fieldName); ok {
+	if f, ok := structType.FieldByName(fieldName); ok {
 		jsonTag := f.Tag.Get("json")
 		if jsonTag != "" && jsonTag != "-" {
 			if idx := strings.Index(jsonTag, ","); idx != -1 {
@@ -229,7 +228,7 @@ func (h *ProductHandler) UpdateProduct(c *fiber.Ctx) error {
 	productIDStr := c.Params("productId")
 	productID, err := uuid.Parse(productIDStr)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "invalid product id format",
 		})
 	}
@@ -274,7 +273,7 @@ func (h *ProductHandler) UpdateProduct(c *fiber.Ctx) error {
 	if err := validate.Struct(req); err != nil {
 		var details []string
 		for _, ve := range err.(validator.ValidationErrors) {
-			fieldName := getJSONTagName(ve.StructNamespace())
+			fieldName := getJSONTagName(ve.StructNamespace(), reflect.TypeOf(req))
 			switch ve.Tag() {
 			case "required":
 				details = append(details, fieldName+" is required")
@@ -310,6 +309,8 @@ func (h *ProductHandler) UpdateProduct(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 		case err.Error() == "product not found":
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+		case err.Error() == "product doesn't exist":
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
 		default:
 			c.App().Config().ErrorHandler(c, err)
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -327,7 +328,7 @@ func (h *ProductHandler) DeleteProduct(c *fiber.Ctx) error {
 	productIDStr := c.Params("productId")
 	productID, err := uuid.Parse(productIDStr)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "invalid product id format",
 		})
 	}
@@ -352,13 +353,15 @@ func (h *ProductHandler) DeleteProduct(c *fiber.Ctx) error {
 	if err != nil {
 		switch {
 		case err.Error() == "unauthorized: you don't own this product":
-			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error": err.Error(),
 			})
 		case strings.Contains(err.Error(), "no rows in result set"):
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error": "product not found",
 			})
+		case err.Error() == "product doesn't exist":
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
 		default:
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "internal server error",
